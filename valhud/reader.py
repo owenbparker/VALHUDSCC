@@ -35,7 +35,8 @@ BAR_Y = (76, 82)            # the white health bar under each portrait
 BAR_HALF = 20               # bar is 40px wide
 PORTRAIT_Y, PORTRAIT_SIZE = 30, 40
 CARRIER_Y = (90, 124)       # the spike icon under the carrier's portrait
-SCORE_LINE = (790, 24, 1130, 72)   # "0   0:24   0"
+SCORE_LINE = (790, 24, 1130, 72)   # "0   0:24   0" (read for the timer)
+SCORE_BOX = {"left": (800, 28, 846, 72), "right": (1074, 28, 1120, 72)}
 SPIKE_ICON = (930, 24, 990, 70)    # replaces the timer once planted
 # Tab scoreboard: row tops (34px rows), left team's block then right's.
 ROW_TOP = {"left": 338, "right": 569}
@@ -292,45 +293,150 @@ def number(text):
     return int(digits) if digits else None
 
 
+# Windows OCR reads lone digits badly ("0" on its own often comes back as
+# nothing), but reads them fine next to words. So numbers are read in lines
+# like "kills 0 deaths 2 assists 1 ult 3 8 creds 2300": our own rendered
+# label words with the screen's cells pasted between them.
+_label_cache = {}
+
+
+def _label(text, height):
+    from PIL import Image, ImageDraw, ImageFont
+    key = (text, height)
+    if key not in _label_cache:
+        font = ImageFont.truetype(os.path.join(WEB_DIR, "fonts", "Inter.ttf"), max(8, int(height * 0.62)))
+        w = int(font.getlength(text)) + 8
+        img = Image.new("L", (w, height), 255)
+        ImageDraw.Draw(img).text((4, height // 2), text, fill=0, font=font, anchor="lm")
+        _label_cache[key] = img
+    return _label_cache[key]
+
+
+def _drop_currency(cell):
+    """Remove the credits symbol in front of the number (the first blob of
+    ink, followed by a wider gap than between digits)."""
+    w, h = cell.size
+    cols = [any(cell.getpixel((x, y)) < 128 for y in range(h)) for x in range(w)]
+    runs, x = [], 0
+    while x < w:
+        if cols[x]:
+            start = x
+            while x < w and cols[x]:
+                x += 1
+            runs.append((start, x))
+        x += 1
+    if len(runs) >= 2 and runs[1][0] - runs[0][1] >= 6:
+        return cell.crop((runs[1][0] - 2, 0, w, h))
+    return cell
+
+
+def _fit(img, text_h=34):
+    """Crop to the ink and scale it so the text is text_h px tall (the
+    size of the label words), with a white margin."""
+    from PIL import Image, ImageOps
+    box = ImageOps.invert(img).getbbox()
+    if not box:
+        return Image.new("L", (text_h // 2, text_h), 255)
+    img = img.crop(box)
+    k = text_h / img.height
+    img = img.resize((max(1, round(img.width * k)), text_h), Image.LANCZOS)
+    return ImageOps.expand(img, 6, 255)
+
+
+def _line(parts, height, gap=14):
+    from PIL import Image
+    width = sum(p.width for p in parts) + gap * (len(parts) + 1)
+    out = Image.new("L", (width, height), 255)
+    x = gap
+    for p in parts:
+        out.paste(p, (x, (height - p.height) // 2))
+        x += p.width + gap
+    return out
+
+
+def _stack(lines, spacing=24):
+    from PIL import Image
+    width = max(l.width for l in lines)
+    out = Image.new("L", (width, sum(l.height + spacing for l in lines) + spacing), 255)
+    y = spacing
+    for l in lines:
+        out.paste(l, (0, y))
+        y += l.height + spacing
+    return out
+
+
+def _lines_of(words, line_h, spacing):
+    """Words grouped by which pasted line they're on, in reading order."""
+    lines = {}
+    for text, cx, cy in words:
+        i = int((cy - spacing / 2) // (line_h + spacing))
+        lines.setdefault(i, []).append((cx, text))
+    return {i: " ".join(t for _, t in sorted(ws)) for i, ws in lines.items()}
+
+
+_NUM = r"([0-9OoDQlI|SsBZzg]{1,4})"
+
+
+def _field(text, label):
+    m = re.search(label + r"\W*" + _NUM, text, re.I)
+    return number(m.group(1)) if m else None
+
+
 def read_score_line(frame, ocr):
     """{"left": int, "right": int, "timer": seconds} from the top bar."""
-    x0, y0, x1, y1 = SCORE_LINE
-    words = ocr.words(ink(frame.crop(x0, y0, x1, y1), 2, 170))
-    mid = (960 - x0) * 2
     out = {}
-    for text, cx, _ in words:
-        if ":" in text or "." in text:
-            m = re.search(r"(\d+)[:.](\d\d)", text.translate(_DIGITS))
-            if m:
-                out["timer"] = int(m.group(1)) * 60 + int(m.group(2))
-            continue
-        value = number(text)
-        if value is None or value > 30:
-            continue
-        side = "left" if cx < mid - 60 else "right" if cx > mid + 60 else None
-        if side and side not in out:
+    x0, y0, x1, y1 = SCORE_LINE
+    for text, _, _ in ocr.words(ink(frame.crop(x0, y0, x1, y1), 2, 170)):
+        m = re.search(r"(\d+)[:.](\d\d)", text.translate(_DIGITS))
+        if m:
+            out["timer"] = int(m.group(1)) * 60 + int(m.group(2))
+    h = 80
+    left = _fit(ink(frame.crop(*SCORE_BOX["left"]), 1, 170))
+    right = _fit(ink(frame.crop(*SCORE_BOX["right"]), 1, 170))
+    line = _line([_label("home", h), left, _label("away", h), right, _label("end", h)], h)
+    text = " ".join(t for t, _, _ in ocr.words(line))
+    for side, label in (("left", "home"), ("right", "away")):
+        value = _field(text, label)
+        if value is not None and value <= 30:
             out[side] = value
+    out["_text"] = text
     return out
 
 
 def read_scoreboard(frame, ocr):
     """Per row (left rows 0-4, right rows 0-4): name, ult, K/D/A, credits."""
     rows = {}
+    # Names: whole name column per team.
     for side in ("left", "right"):
         top = ROW_TOP[side]
-        x0, x1 = COLS["name"][0], COLS["creds"][1]
-        img = ink(frame.crop(x0, top, x1, top + 5 * ROW_H), 2, 150)
-        words = ocr.words(img)
+        x0, x1 = COLS["name"]
+        words = ocr.words(ink(frame.crop(x0, top, x1, top + 5 * ROW_H), 2, 150))
         for r in range(5):
-            mine = [(t, x0 + cx / 2) for t, cx, cy in words if r * ROW_H <= cy / 2 < (r + 1) * ROW_H]
-            cells = {c: [t for t, x in mine if COLS[c][0] <= x < COLS[c][1]] for c in ("name", "ult", "k", "d", "a", "creds")}
-            ult = re.findall(r"\d+", " ".join(cells["ult"]).translate(_DIGITS))
-            rows[(side, r)] = {
-                "name": " ".join(cells["name"]).strip(),
-                "ult": (int(ult[0]), int(ult[-1])) if len(ult) >= 2 else None,
-                "k": number(" ".join(cells["k"])), "d": number(" ".join(cells["d"])), "a": number(" ".join(cells["a"])),
-                "creds": number(" ".join(cells["creds"])),
-            }
+            mine = sorted((cx, t) for t, cx, cy in words if r * ROW_H <= cy / 2 < (r + 1) * ROW_H)
+            rows[(side, r)] = {"name": " ".join(t for _, t in mine).strip()}
+    # Numbers: one labelled line per player.
+    h, spacing, lines, keys = ROW_H * 2, 24, [], []
+    for side in ("left", "right"):
+        for r in range(5):
+            cell = lambda c: _fit(ink(row_cell(frame, side, r, c, 3), 1, 150))
+            lines.append(_line([_label("kills", h), cell("k"), _label("deaths", h), cell("d"),
+                                _label("assists", h), cell("a"), _label("ult", h), cell("ult"),
+                                _label("creds", h), _fit(_drop_currency(ink(row_cell(frame, side, r, "creds", 3), 1, 150))),
+                                _label("end", h)], h))
+            keys.append((side, r))
+    texts = _lines_of(ocr.words(_stack(lines, spacing)), h, spacing)
+    for i, key in enumerate(keys):
+        text = texts.get(i, "")
+        info = rows[key]
+        info["_text"] = text
+        info["k"], info["d"], info["a"] = _field(text, "kills"), _field(text, "deaths"), _field(text, "assists")
+        info["creds"] = _field(text, "creds")
+        m = re.search(r"ult\W*" + _NUM + r"\W*" + _NUM, text, re.I)
+        if m:
+            info["ult"] = (number(m.group(1)), number(m.group(2)))
+        else:
+            m = re.search(r"ult\W*([0-9OoIl]{2})\b", text, re.I)  # "0/7" read as "07"
+            info["ult"] = (number(m.group(1)[0]), number(m.group(1)[1])) if m else None
     return rows
 
 
@@ -538,10 +644,22 @@ class ScreenReader:
             self._stop.wait(0.5)
 
 
+def _similar(a, b):
+    import difflib
+    norm = lambda t: re.sub(r"[^a-z0-9]", "", str(t or "").lower().replace("1", "l").replace("0", "o"))
+    return difflib.SequenceMatcher(None, norm(a), norm(b)).ratio() >= 0.75
+
+
 TEXT_FIELDS = ("name", "credits", "ult_points", "ult_max", "kills", "deaths", "assists")
 
 
 def main(argv):
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    return _main(argv)
+
+
+def _main(argv):
     """python -m valhud.reader IMAGE [--expect EXPECTED.json]
 
     Prints what was read from a saved screenshot; with --expect, checks the
@@ -556,10 +674,16 @@ def main(argv):
     parser.add_argument("--no-ocr", action="store_true")
     args = parser.parse_args(argv)
     ocr = None if args.no_ocr else WindowsOcr()
-    update = read_frame(Image.open(args.image), ocr)
-    print(json.dumps(update["match"]))
+    image = Image.open(args.image)
+    update = read_frame(image, ocr)
+    if ocr:  # what the text recognition saw, for tuning
+        frame = Frame(image)
+        print("score line:", read_score_line(frame, ocr))
+        for key, info in read_scoreboard(frame, ocr).items():
+            print("row", key, info)
+    print(json.dumps(update["match"], ensure_ascii=False))
     for p in update["players"]:
-        print(json.dumps(p))
+        print(json.dumps(p, ensure_ascii=False))
     if not args.expect:
         return 0
     with open(args.expect, encoding="utf-8") as f:
@@ -576,6 +700,8 @@ def main(argv):
         for key, value in e.items():
             if key in ("team", "slot") or (ocr is None and key in TEXT_FIELDS):
                 continue
+            if key == "name" and _similar(p.get(key), value):
+                continue  # names only need to be close (OCR mixes up l / 1, symbols)
             if p.get(key) != value:
                 bad.append(f"{e['team']} {e['slot']} {key}: read {p.get(key)!r}, expected {value!r}")
     print("\n".join(bad) if bad else "OK")
