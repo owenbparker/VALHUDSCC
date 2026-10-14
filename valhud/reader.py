@@ -41,7 +41,9 @@ SPIKE_ICON = (930, 24, 990, 70)    # replaces the timer once planted
 # Tab scoreboard: row tops (34px rows), left team's block then right's.
 ROW_TOP = {"left": 338, "right": 569}
 ROW_H = 34
-COLS = {"portrait": (573, 607), "name": (643, 812), "ult": (812, 933), "k": (934, 973), "d": (974, 1013),
+COLS = {"portrait": (573, 607), "name": (643, 812), "ult": (812, 933),
+        "ult_have": (812, 867), "ult_need": (879, 933),  # either side of the "/"
+        "k": (934, 973), "d": (974, 1013),
         "a": (1014, 1053), "weapon": (1060, 1168), "shield": (1170, 1204), "creds": (1204, 1294)}
 WINDOW_TITLE = "VALORANT"
 
@@ -420,7 +422,7 @@ def read_scoreboard(frame, ocr):
         for r in range(5):
             cell = lambda c: _fit(ink(row_cell(frame, side, r, c, 3), 1, 150))
             lines.append(_line([_label("kills", h), cell("k"), _label("deaths", h), cell("d"),
-                                _label("assists", h), cell("a"), _label("ult", h), cell("ult"),
+                                _label("assists", h), cell("a"), _label("ult", h), cell("ult_have"), _label("of", h), cell("ult_need"),
                                 _label("creds", h), _fit(_drop_currency(ink(row_cell(frame, side, r, "creds", 3), 1, 150))),
                                 _label("end", h)], h))
             keys.append((side, r))
@@ -431,12 +433,8 @@ def read_scoreboard(frame, ocr):
         info["_text"] = text
         info["k"], info["d"], info["a"] = _field(text, "kills"), _field(text, "deaths"), _field(text, "assists")
         info["creds"] = _field(text, "creds")
-        m = re.search(r"ult\W*" + _NUM + r"\W*" + _NUM, text, re.I)
-        if m:
-            info["ult"] = (number(m.group(1)), number(m.group(2)))
-        else:
-            m = re.search(r"ult\W*([0-9OoIl]{2})\b", text, re.I)  # "0/7" read as "07"
-            info["ult"] = (number(m.group(1)[0]), number(m.group(1)[1])) if m else None
+        have, need = _field(text, "ult"), _field(text, "of")
+        info["ult"] = (have, need) if have is not None and need is not None and have <= need <= 9 else None
     return rows
 
 
