@@ -241,7 +241,7 @@ class OverlayWindow:
 # Where the self-test expects the HUD to be drawn, and to be see-through
 # (fractions of the screen): the top bar, and gaps between the player panels
 # and the round-win banner.
-HUD_POINTS = [(0.45, 35 / 1080), (0.5, 35 / 1080), (0.55, 35 / 1080)]
+HUD_POINTS = [(0.42, 35 / 1080), (0.45, 35 / 1080), (0.55, 35 / 1080)]  # not the centre: its box is see-through
 EMPTY_POINTS = [(0.5, 0.6), (0.3, 0.75), (0.7, 0.75), (0.5, 0.45), (0.1, 0.3)]
 
 
