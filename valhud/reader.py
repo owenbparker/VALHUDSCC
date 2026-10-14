@@ -422,7 +422,7 @@ def read_scoreboard(frame, ocr):
         for r in range(5):
             cell = lambda c: _fit(ink(row_cell(frame, side, r, c, 3), 1, 150))
             lines.append(_line([_label("kills", h), cell("k"), _label("deaths", h), cell("d"),
-                                _label("assists", h), cell("a"), _label("ult", h), cell("ult_have"), _label("needs", h), cell("ult_need"),
+                                _label("assists", h), cell("a"), 
                                 _label("creds", h), _fit(_drop_currency(ink(row_cell(frame, side, r, "creds", 3), 1, 150))),
                                 _label("end", h)], h))
             keys.append((side, r))
@@ -433,12 +433,28 @@ def read_scoreboard(frame, ocr):
         info["_text"] = text
         info["k"], info["d"], info["a"] = _field(text, "kills"), _field(text, "deaths"), _field(text, "assists")
         info["creds"] = _field(text, "creds")
-        have, need = _field(text, "ult"), _field(text, "needs")
-        if need is None:  # the label went missing: "ult 0 7"
-            m = re.search(r"ult\W*" + _NUM + r"\W+" + _NUM, text, re.I)
-            if m:
-                have, need = number(m.group(1)), number(m.group(2))
-        info["ult"] = (have, need) if have is not None and need is not None and have <= need <= 9 else None
+        info["ult"] = None
+    # Ult points ("0 / 7"): OCR sometimes drops the first digit, so they're
+    # read three ways and the first reading that makes sense is kept.
+    variants = [
+        lambda have, need: [_label("ult", h), have, _label("of", h), need, _label("end", h)],
+        lambda have, need: [_label("points", h), have, _label("needs", h), need, _label("end", h)],
+        lambda have, need: [_label("charge", h), have, _label("slash", h), need, _label("done", h)],
+    ]
+    pairs = [(_fit(ink(row_cell(frame, side, r, "ult_have", 3), 1, 150)),
+              _fit(ink(row_cell(frame, side, r, "ult_need", 3), 1, 150))) for side, r in keys]
+    labels = [("ult", "of"), ("points", "needs"), ("charge", "slash")]
+    for make, (first, second) in zip(variants, labels):
+        todo = [i for i, key in enumerate(keys) if rows[key]["ult"] is None]
+        if not todo:
+            break
+        texts = _lines_of(ocr.words(_stack([_line(make(*pairs[i]), h) for i in todo], spacing)), h, spacing)
+        for n, i in enumerate(todo):
+            text = texts.get(n, "")
+            have, need = _field(text, first), _field(text, second)
+            if have is not None and need is not None and have <= need and 5 <= need <= 9:
+                rows[keys[i]]["ult"] = (have, need)
+            rows[keys[i]]["_ult_text"] = rows[keys[i]].get("_ult_text", []) + [text]
     return rows
 
 
