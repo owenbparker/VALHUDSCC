@@ -1,0 +1,580 @@
+<html>
+   <head>
+       <!-- SCC: driven by /driver.js from the app's /api/state (was /MaatoohWs.js). No doctype: the template needs quirks mode. -->
+       <link rel='stylesheet' href='styles.css'>
+   </head>
+   <body>
+     <!-- -->
+	 <div class='ScoreBoard' style="display: none;">
+	
+		<img src="resources/Logos/logo1.png" class="logo1">
+		<img src="resources/Logos/logo2.png" class="logo2">
+	
+		<div class="rombo-container" id="rombo-container1">
+			<div class="rombo" style="visibility: hidden;"></div>
+			<div class="rombo" style="visibility: hidden;"></div>
+			<div class="rombo" style="visibility: hidden;"></div>
+		</div>
+	
+		<div class="rombo-container" id="rombo-container2">
+			<div class="rombo" style="visibility: hidden;"></div>
+			<div class="rombo" style="visibility: hidden;"></div>
+			<div class="rombo" style="visibility: hidden;"></div>
+		</div>
+		
+		<img src="" style="visibility: hidden" class="portador" id='portador'>
+		
+		<img class="logo1b">
+		<img class="logo2b">
+	
+	   <h2 class='Score1'>0</h2>
+	   <h2 class='Score2'>0</h2>
+	   <h3 id='resultado'></h3>
+   <h4 class="Team1">VLR1</h4>
+   <h4 class="Team2">VLR2</h4>
+   <h4 class="RTagTeam1" style="display:none;"></h4>
+   <h4 class="RTagTeam2" style="display:none;"></h4>
+	<div class="Maps">
+   <h4 class="Map1">CURRENT</h4>
+   <h4 class="Map2">NEXT</h4>
+   <h4 class="Map3">DECIDER</h4>
+	</div>
+
+        <!-- -->
+
+   <h4 class="Team1b"></h4>
+   <h4 class="Team2b"></h4>
+   
+    <div class='RoundTeams'>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+		<div class='Round-Val'><div class='Round-Select'></div><div class='Round-Background'></div><div class='Round-Num'></div><div class='Round-State'></div></div>
+	</div>
+
+	<div class='TeamIzquierda' id='teamIzquierda'>
+		<div class='TIP1'>
+			<div class='Icon IconB1'></div>
+			<div class='Name'></div>
+			<div class='Shield'>
+				<div class='SP1'></div>
+			</div>
+			<div class='Points'>
+				<div class='PP1'></div>
+			</div>
+			<div class='Weapon1'></div>
+			<div class="Skill1">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4'></div>
+			<div class='HP1'></div>
+			<div class='K1'></div>
+			<div class='D1'></div>
+			<div class='A1'></div>
+			<div class="ulti-container1" id="ulti-container">
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>				
+			</div>
+		</div>
+		<div class='TIP2'>
+			<div class='Icon IconB1'></div>
+			<div class='Name'></div>
+			<div class='Shield'>
+				<div class='SP1'></div>
+			</div>
+			<div class='Points'>
+				<div class='PP1'></div>
+			</div>
+			<div class='Weapon1'></div>
+			<div class="Skill1">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4'></div>
+			<div class='HP1'></div>
+			<div class='K1'></div>
+			<div class='D1'></div>
+			<div class='A1'></div>
+			<div class="ulti-container1" id="ulti-container">
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>			
+			</div>
+		</div>
+		<div class='TIP3'>
+			<div class='Icon IconB1'></div>
+			<div class='Name'></div>
+			<div class='Shield'>
+				<div class='SP1'></div>
+			</div>
+			<div class='Points'>
+				<div class='PP1'></div>
+			</div>
+			<div class='Weapon1'></div>
+			<div class="Skill1">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4'></div>
+			<div class='HP1'></div>
+			<div class='K1'></div>
+			<div class='D1'></div>
+			<div class='A1'></div>
+			<div class="ulti-container1" id="ulti-container">
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>			
+			</div>
+		</div>
+		<div class='TIP4'>
+			<div class='Icon IconB1'></div>
+			<div class='Name'></div>
+			<div class='Shield'>
+				<div class='SP1'></div>
+			</div>
+			<div class='Points'>
+				<div class='PP1'></div>
+			</div>
+			<div class='Weapon1'></div>
+			<div class="Skill1">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4'></div>
+			<div class='HP1'></div>
+			<div class='K1'></div>
+			<div class='D1'></div>
+			<div class='A1'></div>
+			<div class="ulti-container1" id="ulti-container">
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+			</div>
+		</div>
+		<div class='TIP5'>
+			<div class='Icon IconB1'></div>
+			<div class='Name'></div>
+			<div class='Shield'>
+				<div class='SP1'></div>
+			</div>
+			<div class='Points'>
+				<div class='PP1'></div>
+			</div>
+			<div class='Weapon1'></div>
+			<div class="Skill1">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3">
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+				<div class="UPS1" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4'></div>
+			<div class='HP1'></div>
+			<div class='K1'></div>
+			<div class='D1'></div>
+			<div class='A1'></div>
+			<div class="ulti-container1" id="ulti-container">
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+				<div class="UP1" style="background-color: transparent;"></div>
+			</div>
+		</div>
+	  </div>
+	  <div class='TeamDerecha' id='teamDerecha'>
+		<div class='TDP1'>
+			<div class='Icon IconB2'></div>
+			<div class='Name2'></div>
+			<div class='Shield'>
+			<div class='SP2'></div>
+			</div>
+			<div class='Points'>
+			<div class='PP2'></div>
+			</div>
+			<div class='Weapon2'></div>
+			<div class="Skill1 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4 SR'></div>
+			<div class='HP2'></div>
+			<div class='K2'></div>
+			<div class='D2'></div>
+			<div class='A2'></div>
+			<div class="ulti-container2" id="ulti-container">
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>				
+			</div>
+		</div>
+		<div class='TDP2'>
+			<div class='Icon IconB2'></div>
+			<div class='Name2'></div>
+			<div class='Shield'>
+			<div class='SP2'></div>
+			</div>
+			<div class='Points'>
+			<div class='PP2'></div>
+			</div>
+			<div class='Weapon2'></div>
+			<div class="Skill1 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4 SR'></div>
+			<div class='HP2'></div>
+			<div class='K2'></div>
+			<div class='D2'></div>
+			<div class='A2'></div>
+			<div class="ulti-container2" id="ulti-container">
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>				
+			</div>
+		</div>
+		<div class='TDP3'>
+			<div class='Icon IconB2'></div>
+			<div class='Name2'></div>
+			<div class='Shield'>
+			<div class='SP2'></div>
+			</div>
+			<div class='Points'>
+			<div class='PP2'></div>
+			</div>
+			<div class='Weapon2'></div>
+			<div class="Skill1 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4 SR'></div>
+			<div class='HP2'></div>
+			<div class='K2'></div>
+			<div class='D2'></div>
+			<div class='A2'></div>
+			<div class="ulti-container2" id="ulti-container">
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>				
+			</div>
+		</div>
+		<div class='TDP4'>
+			<div class='Icon IconB2'></div>
+			<div class='Name2'></div>
+			<div class='Shield'>
+			<div class='SP2'></div>
+			</div>
+			<div class='Points'>
+			<div class='PP2'></div>
+			</div>
+			<div class='Weapon2'></div>
+			<div class="Skill1 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4 SR'></div>
+			<div class='HP2'></div>
+			<div class='K2'></div>
+			<div class='D2'></div>
+			<div class='A2'></div>
+			<div class="ulti-container2" id="ulti-container">
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>				
+			</div>
+		</div>
+		<div class='TDP5'>
+			<div class='Icon IconB2'></div>
+			<div class='Name2'></div>
+			<div class='Shield'>
+			<div class='SP2'></div>
+			</div>
+			<div class='Points'>
+			<div class='PP2'></div>
+			</div>
+			<div class='Weapon2'></div>
+			<div class="Skill1 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill2 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class="Skill3 SR">
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+				<div class="UPS2" style="background-color: transparent"></div>
+			</div>
+			<div class='Skill4 SR'></div>
+			<div class='HP2'></div>
+			<div class='K2'></div>
+			<div class='D2'></div>
+			<div class='A2'></div>
+			<div class="ulti-container2" id="ulti-container">
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>
+				<div class="UP2" style="background-color: transparent;"></div>				
+			</div>
+		</div>
+	   </div>
+   </div>
+
+    <div class='Mapbans' style="display: none;">
+	<div class="DivisorY"></div>
+	<div class="DivisorB" ></div>
+	<div class="LogoSponsor"></div>
+	<div class="MapBansArray">		
+		<div class="MapBan">
+			<div class="TeamBan"></div>
+			<div class="BanTitle"></div>
+			<div class="LogoText"></div>
+			<div class="MapSelect"></div>
+			<div class="MapBanIcon"></div>
+			<div class="MapSelectSubText"></div>			
+			<div class="MapBackground"></div>
+		</div>
+		<div class="MapBan">
+			<div class="TeamBan"></div>
+			<div class="BanTitle"></div>
+			<div class="LogoText"></div>
+			<div class="MapSelect"></div>
+			<div class="MapBanIcon"></div>
+			<div class="MapSelectSubText"></div>			
+			<div class="MapBackground"></div>
+		</div>
+		<div class="MapBan">
+			<div class="TeamBan"></div>
+			<div class="BanTitle"></div>
+			<div class="LogoText"></div>
+			<div class="MapSelect"></div>
+			<div class="MapBanIcon"></div>
+			<div class="MapSelectSubText"></div>			
+			<div class="MapBackground"></div>
+		</div>
+		<div class="MapBan">
+			<div class="TeamBan"></div>
+			<div class="BanTitle"></div>
+			<div class="LogoText"></div>
+			<div class="MapSelect"></div>
+			<div class="MapBanIcon"></div>
+			<div class="MapSelectSubText"></div>			
+			<div class="MapBackground"></div>
+		</div>
+		<div class="MapBan">
+			<div class="TeamBan"></div>
+			<div class="BanTitle"></div>
+			<div class="LogoText"></div>
+			<div class="MapSelect"></div>
+			<div class="MapBanIcon"></div>
+			<div class="MapSelectSubText"></div>			
+			<div class="MapBackground"></div>
+		</div>
+		<div class="MapBan">
+			<div class="TeamBan"></div>
+			<div class="BanTitle"></div>
+			<div class="LogoText"></div>
+			<div class="MapSelect"></div>
+			<div class="MapBanIcon"></div>
+			<div class="MapSelectSubText"></div>			
+			<div class="MapBackground"></div>
+		</div>
+		<div class="MapBan">
+			<div class="TeamBan"></div>
+			<div class="BanTitle"></div>
+			<div class="LogoText"></div>
+			<div class="MapSelect"></div>
+			<div class="MapBanIcon"></div>
+			<div class="MapSelectSubText"></div>			
+			<div class="MapBackground"></div>
+		</div>
+	</div>
+    </div>
+	
+	 <!-- technical pause -->
+    <div class="Pause TechPause" style="display:none;">
+      <img src="Resources/outline.png" class="pause-Outline" />
+    </div>
+    <!-- defense timeout -->
+    <div class="Pause DefTimeout" style="display:none;">
+        <img src="resources/Logos/logo1.png" class="pause-logo logo1c" />
+    </div>
+    <!-- attacker Timeout -->
+    <div class="Pause AttTimeout" style="display:none;">
+        <img src="resources/Logos/logo2.png" class="pause-logo logo2c" />
+    </div>
+
+    <script src='/driver-pre.js'></script>
+
+    <script src='Main.js'></script>
+	<script src='Extra.js'></script>
+ <script src='/driver.js'></script>
+ </body>
+</html>

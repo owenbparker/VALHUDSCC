@@ -1,0 +1,946 @@
+    @font-face {
+    font-family: Tungsten;
+    src: url('Resources/Tungsten-Bold.ttf');
+    }
+
+    @font-face {
+    font-family: Arabic;
+    src: url('Resources/Arabic.ttf');
+    }
+
+    @font-face {
+    font-family: Arabicb;
+    src: url('Resources/Arabicb.ttf');
+    }
+
+    @font-face {
+    font-family: FGridnik-R;
+    src: url('Resources/FoundryGridnik-Regular.otf');
+    }
+
+    @font-face {
+    font-family: FGridnik-B;
+    src: url('Resources/FoundryGridnik-Bold.otf');
+    }
+
+    @font-face {
+    font-family: FGridnik-EB;
+    src: url('Resources/FoundryGridnik-ExtraBold.otf');
+    }
+    
+	body::-webkit-scrollbar {
+		display: none;
+	}
+	
+    /* Title */
+    body > div.Bracket > h1 {
+        position: absolute;
+        font-family: impact;
+        color: white;
+        font-size: 52px;
+        -webkit-text-stroke: 2px black;
+        left: 780px;
+        top: 400px;
+    }
+    /* Figure 1 */
+    
+    body > div.Bracket > div.Figure1{
+        background-image: url(Resources/Layer1.png);
+        background-repeat: no-repeat;
+        height: 190px;
+        width: 128px;
+        margin-left: 879px;
+        margin-top: 110px;
+    }
+    
+    
+    /* Bracket 8 Players */
+    
+    body > div.Bracket > div.Figure2{
+        background-repeat: no-repeat;
+        width: 1202px;
+        height: 676px;
+        top: 0px;
+        position: absolute;
+    }
+    
+    
+    /* Bracket 8 Players With Loser*/
+    
+    /* Player Display */
+    
+    .Match1, .Match2, .Match3, .winner, .winner1, .winner2, .MatchL1, .MatchL2, .MatchL3, .MatchL4{
+        font-family: 'afb';
+        position: absolute;
+        text-align: center;
+    }
+    
+    .Score1, .Score2{
+        font-family: 'Tungsten';
+        position: absolute;
+        text-align: center;
+		display:none;
+    }
+    
+    .Score1 {
+		color: #00ffc6;
+		left: 682px;
+		font-size: 34px;
+		top: 636px;
+		margin-top: 0px;
+		margin-bottom: 0px;
+		width: 44px;
+		text-align: center;
+		display: block;
+		z-index: 1;
+        display: none;
+	}
+    
+    .Score2{
+		color: #ff4d5e;
+		left: 682px;
+		font-size: 34px;
+		top: 677px;
+		margin-top: 0px;
+		margin-bottom: 0px;
+		width: 44px;
+		text-align: center;
+		display: block;
+		z-index: 1;
+        display: none;
+    }
+    
+    
+    .lb{
+        font-size:larger;
+    }
+    
+    /*---------------------------------------------------------*/
+    
+    body > div.ScoreBoard > div.TeamIzquierda > div.TIP1{
+        position: absolute;
+        width: 316px;
+        height: 83px;
+        top: 788px;
+        left: 573px;
+    }
+    
+    body > div.ScoreBoard > div.TeamIzquierda > div.TIP2{
+        position: absolute;
+        width: 316px;
+        height: 83px;
+        top: 843px;
+        left: 573px;
+    }
+    
+    body > div.ScoreBoard > div.TeamIzquierda > div.TIP3{
+        position: absolute;
+        width: 316px;
+        height: 83px;
+        top: 900px;
+        left: 573px;
+    }
+    
+    body > div.ScoreBoard > div.TeamIzquierda > div.TIP4{
+        position: absolute;
+        width: 316px;
+        height: 83px;
+        top: 955px;
+        left:573px;
+    }
+    
+    body > div.ScoreBoard > div.TeamIzquierda > div.TIP5{
+        position: absolute;
+        width: 316px;
+        height: 83px;
+        top: 1012px;
+        left: 573px;
+    }
+    
+    .Name {
+        position: absolute;
+        font-size: 20px;
+        width: 220px;
+        text-align: left;
+        top: 14px;
+        left: 80px;
+        color: whitesmoke;
+        font-family: FGridnik-B;
+    }
+    
+    .Icon{
+        width: 105px;
+        height: 50px;
+        position: absolute;
+        background-size: 68px 68px;
+        background-repeat: no-repeat;
+        background-position-y: -13px;
+    }
+
+    .Skill1 {
+        width: 33px;
+        height: 52px;
+        left: -375px;
+        top: 0px;
+        position: absolute;
+        background-size: 25px 25px;
+        background-repeat: no-repeat;
+        background-position-x: center;
+        background-position-y: 10px;
+        text-align: center;
+    }
+    
+    .Skill2 {
+        width: 33px;
+        height: 52px;
+        left: -329px;
+        top: -1px;
+        position: absolute;
+        background-size: 25px 25px;
+        background-repeat: no-repeat;
+        background-position-x: center;
+        background-position-y: 10px;
+        text-align: center;
+    }
+        
+    .Skill3 {
+        width: 33px;
+        height: 52px;
+        left: -282px;
+        top: 0px;
+        position: absolute;
+        background-size: 25px 25px;
+        background-repeat: no-repeat;
+        background-position-x: center;
+        background-position-y: 10px;
+        text-align: center;
+    }
+
+    .Skill4 {
+        width: 37px;
+        height: 37px;
+        top: 7px;
+        left: -55px;
+        position: absolute;
+        background-size: 25px 25px;
+        background-repeat: no-repeat;
+        background-position-x: center;
+        background-position-y: center;
+        text-align: center;
+        z-index: 2;
+        background-color: #1e1e1e85;
+        border-radius: 50%;
+    }
+
+    .SR{
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+	
+    .Skill1.SR {
+        left: -283px;
+    }
+
+    .Skill3.SR {
+        left: -377px;
+    }
+    
+	@keyframes pulse {
+    0% {
+      box-shadow: 0 0 9px 3px rgba(255, 255, 255, 0.5);
+    }
+    100% {
+      box-shadow: 0 0 3px 3px rgba(255, 255, 255, 0.5);
+    }
+	}
+	
+    .Points {
+        width: 60px;
+        height: 15px;
+        left: -510px;
+        top: 17px;
+        position: absolute;
+        background-size: 12px 12px;
+        background-position-y: 2px;
+        background-position-x: right;
+        background-repeat: no-repeat;
+        background-image: url(Resources/Escudos/CV.png);
+        text-align: end;
+        font-family: 'Arabic';
+        font-size: 18px;
+        color: whitesmoke;
+    }
+    
+    .PP1 {
+        position: absolute;
+        right: 16px;
+        top: -3px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+    }
+        
+    .Weapon1 {
+        width: 92px;
+        height: 29px;
+        left: -165px;
+        top: 11px;
+        position: absolute;
+        background-repeat: no-repeat;
+        background-position-y: center;
+        background-position-x: right;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    .Shield {
+        width: 73px;
+        height: 32px;
+        left: -215px;
+        top: 9px;
+        position: absolute;
+        background-size: 23px 25px;
+        background-repeat: no-repeat;
+        background-position-y: center;
+        font-family: arial;
+        font-size: 19px;
+        color: whitesmoke;
+    }
+    
+    .SP1{
+        position: absolute;
+        left: 29px;
+        top: 5px;
+        width: 38px;
+        text-align: center;
+        display: none;
+    }
+    
+    .HP1{
+        position: absolute;
+        bottom: 25px;
+        width: 0%;
+        height: 8px;
+        background-color: #00ffca;
+        display:none;
+    }
+    
+    /*---------------------------------------------------------*/
+    
+    body > div.ScoreBoard > div.TeamDerecha > div.TDP1{
+        position: absolute;
+        width: 315px;
+        height: 83px;
+        top: 769px;
+        left: 1035px;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    body > div.ScoreBoard > div.TeamDerecha > div.TDP2{
+        position: absolute;
+        width: 315px;
+        height: 83px;
+        top: 825px;
+        left: 1035px;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    body > div.ScoreBoard > div.TeamDerecha > div.TDP3{
+        position: absolute;
+        width: 315px;
+        height: 83px;
+        top: 881px;
+        left: 1035px;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    body > div.ScoreBoard > div.TeamDerecha > div.TDP4{
+        position: absolute;
+        width: 315px;
+        height: 83px;
+        top: 937px;
+        left: 1035px;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    body > div.ScoreBoard > div.TeamDerecha > div.TDP5{
+        position: absolute;
+        width: 315px;
+        height: 83px;
+        top: 993px;
+        left: 1035px;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    .Weapon2 {
+        width: 92px;
+        height: 29px;
+        left: -165px;
+        top: 11px;
+        position: absolute;
+        background-repeat: no-repeat;
+        background-position-y: center;
+        background-position-x: right;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    .HP2{
+        position: absolute;
+        bottom: 25px;
+        width: 0%;
+        height: 8px;
+        background-color: #ff4e5e;
+        display:none;
+    }
+        
+    .Name2 {
+        position: absolute;
+        font-size: 20px;
+        width: 220px;
+        text-align: right;
+        top: 14px;
+        left: 80px;
+        color: whitesmoke;
+        font-family: 'FGridnik-B';
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .SP2{
+        position: absolute;
+        left: 29px;
+        top: 5px;
+        width: 38px;
+        text-align: center;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+        display: none;
+    }
+    
+    .PP2 {
+        position: absolute;
+        right: 16px;
+        top: -2px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+    
+    .K1 {
+        position: absolute;
+        font-size: 20px;
+        width: 40px;
+        text-align: center;
+        top: 14px;
+        left: 231px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+    }
+
+    .D1 {
+        position: absolute;
+        font-size: 20px;
+        width: 40px;
+        text-align: center;
+        top: 14px;
+        left: 281px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+    }
+
+    .A1 {
+        position: absolute;
+        font-size: 20px;
+        width: 40px;
+        text-align: center;
+        top: 14px;
+        left: 331px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+    }
+
+    .K2 {
+        position: absolute;
+        font-size: 20px;
+        width: 40px;
+        text-align: center;
+        top: 14px;
+        left: 331px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .D2 {
+        position: absolute;
+        font-size: 20px;
+        width: 40px;
+        text-align: center;
+        top: 14px;
+        left: 281px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+        
+    .A2 {
+        position: absolute;
+        font-size: 20px;
+        width: 40px;
+        text-align: center;
+        top: 14px;
+        left: 231px;
+        color: #a0a2a3;
+        font-family: 'FGridnik-B';
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+	
+    .imagen {
+        position: absolute;
+        top: 50px;
+        left: 100px;
+      }
+      
+    .element.style {
+        position: absolute;
+        left: 474px;
+        top: 383px;
+        z-index: 2;
+    }
+
+    .info1 {
+        position: absolute;
+        left: 135px;
+        width: 815px;
+        height: 26px;
+        top: 746px;
+        font-size: 18px;
+        font-family: 'Arabicb';
+        color: #a0a2a3;
+    }
+
+    .player1 {
+        width: 80px;
+        top: -30px;
+        left: 3px;
+        position: absolute;
+        letter-spacing: 2px;
+    }
+
+    .KDAT1 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 175px;
+        letter-spacing: 28px;
+        text-align: center;
+    }
+
+    .abilities1 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 389px;
+        letter-spacing: 2px;
+        text-align: center;
+    }
+
+    .shieldt1 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 516px;
+        letter-spacing: 2px;
+        text-align: center;
+    }
+
+    .loadout1 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 616px;
+        letter-spacing: 2px;
+        text-align: center;
+    }
+
+    .creds1 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 715px;
+        letter-spacing: 2px;
+        text-align: center;
+    }
+
+    .info2 {
+        position: absolute;
+        left: 976px;
+        width: 815px;
+        height: 26px;
+        top: 746px;
+        font-size: 18;
+        font-family: 'Arabicb';
+        color: #a0a2a3;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .player2 {
+        width: 80px;
+        top: -30px;
+        left: 4px;
+        position: absolute;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+        letter-spacing: 2px;
+    }
+
+    .KDAT2 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 172px;
+        letter-spacing: 28px;
+        text-align: center;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .abilities2 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 407px;
+        letter-spacing: 3px;
+        text-align: center;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .shieldt2 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 522px;
+        letter-spacing: 2px;
+        text-align: center;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .loadout2 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 622px;
+        letter-spacing: 2px;
+        text-align: center;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .creds2 {
+        width: 100px;
+        top: -30px;
+        position: absolute;
+        left: 721px;
+        letter-spacing: 2px;
+        text-align: center;
+        transform: scaleX(-1);
+        -webkit-transform: scaleX(-1);
+    }
+
+    .logo1 {
+        position: absolute;
+        left: 654px;
+        top: 825px;
+        width: 200px;
+        height: 200px;
+        opacity: 0.1;
+    }
+    
+    .logo2 {
+        position: absolute;
+        left: 1069px;
+        top: 825px;
+        width: 200px;
+        height: 200px;
+        opacity: 0.1;
+    }
+
+    .logo1b {
+        position: absolute;
+        left: 630px;
+        width: 22px;
+        height: 22px;
+        top: 636px;
+        z-index: 1;
+    }
+    
+    .logo2b {
+        position: absolute;
+        left: 630px;
+        width: 22px;
+        height: 22px;
+        top: 690px;
+        z-index: 1;
+    }
+
+    .Team1 {
+        position: absolute;
+        left: 654px;
+        font-family: 'FGridnik-B';
+        color: white;
+        font-size: 20px;
+        top: 610px;
+        text-align: center;
+        width: 65px;
+        z-index: 1;
+    }
+    
+    .Team2 {
+        position: absolute;
+        left: 654px;
+        font-family: 'FGridnik-B';
+        color: white;
+        font-size: 20px;
+        top: 663px;
+        text-align: center;
+        width: 65px;
+        z-index: 1;
+    }
+
+    .Team1b {
+        position: absolute;
+        left: 140px;
+        font-family: 'Tungsten';
+        color: white;
+        font-size: 55px;
+        top: 572px;
+        text-align: left;
+        width: 520px;
+        display: none;
+    }
+    
+    .Team2b {
+        position: absolute;
+        left: 1255px;
+        font-family: 'Tungsten';
+        color: white;
+        font-size: 55px;
+        top: 572px;
+        text-align: right;
+        width: 520px;
+        display: none;
+    }
+
+    .map1 {
+        position: absolute;
+        color: white;
+        font-family: arabic;
+        top: -15px;
+        left: 0px;
+        text-align: center;
+        font-size: 11px;
+        width: 160px;
+        height: 20px;
+        letter-spacing: 1px;
+        background-color: black;
+		display:none;
+    }
+    
+    .map2 {
+        position: absolute;
+        color: white;
+        font-family: arabic;
+        top: -15px;
+        left: 170px;
+        text-align: center;
+        font-size: 11px;
+        width: 160px;
+        height: 20px;
+        letter-spacing: 1px;
+        background-color: black;
+		display:none;
+    }
+    
+    .map3 {
+        position: absolute;
+        color: white;
+        font-family: arabic;
+        top: -15px;
+        left: 340px;
+        text-align: center;
+        font-size: 11px;
+        width: 160px;
+        height: 20px;
+        letter-spacing: 1px;
+        background-color: black;
+		display:none;
+    }
+    
+	#resultado{
+		display:none;
+	}
+	
+    #rombo-container1 {
+        text-align: center;
+        position: absolute;
+        left: 766px;
+        top: 79px;
+		display:none;
+    }
+    
+    #rombo-container2 {
+        text-align: center;
+        position: absolute;
+        left: 1088px;
+        top: 79px;
+        transform: scaleX(-1);
+		display:none;
+    }
+    
+    .rombo {
+        width: 6px;
+        height: 6px;
+        background-color: transparent;
+        position: relative;
+        transform: rotate(45deg);
+        border: 2px solid rgb(255, 255, 255);
+        margin: 5px;
+        transition: all 0.5s;
+        display: inline-block;
+		display:none;
+    }
+    
+    .rombo.relleno {
+        background-color: rgb(255, 255, 255);
+    }
+
+    .ulti-container1 {
+        top: 4.2px;
+        left: -57.7px;
+    }
+
+    .ulti-container2 {
+        top: 4.2px;
+        left: -57.7px;
+    }
+
+	#ulti-container {
+        position: absolute;
+        width: 42px;
+        height: 42px;
+        display: flex;
+        place-content: end;
+        align-items: center;
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
+        z-index: 2;
+    }
+    
+    .UP1, .UP2 {
+		width: 18px;
+		height: 6px;
+		background: #00000085;
+		transform: rotate(45deg);
+		display: block;
+		position: absolute;
+		transition: all 0.2s ease-in-out;
+	}
+	
+    .UPS1, .UPS2 {
+        width: 8px;
+        height: 4px;
+        background: #00000085;
+        margin-top: 40px;
+        margin-left: 0px;
+        display: inline-block;
+    }
+    
+    h3 {
+        font-family: Calibri, sans-serif;
+        position: absolute;
+        width: 118px;
+        left: 901px;
+        top: -6px;
+        color: rgb(255, 255, 255);
+        font-size: 12px;
+        text-align: center;
+    }
+	
+    .RoundTeams {
+        position: absolute;
+        width: 678px;
+        height: 101px;
+        top: 623px;
+        left: 621px;
+        display: flex;
+    }
+	
+	.Round-Val{
+		width: 44px;
+		height: 101px;
+		color: #a0a2a3;
+		font-family: arabicb;
+		text-align: center;
+		align-content: center;
+		font-size: 25px;
+	}
+	
+	.Round-Select{
+		position: absolute;
+		width: 44px;
+		height: 101px;
+		top: 0px;
+		align-content: center;
+		background-size: 54px;
+		background-repeat: no-repeat;
+		background-position-x: center;
+		background-position-y: -11px;
+		z-index: 1;
+	}
+	
+	.Round-Background{
+		background-color: #191e23;
+		width: 44px;
+		height: 51px;
+		position: absolute;
+		top: 0px;
+		z-index: 0;
+	}
+	
+	.Round-Val:first-child {
+		margin-left: 105px;
+	}
+	
+	.Round-Num {
+		position: absolute;
+		margin-left: 8px;
+		top: 32px;
+	}
+	
+	.Round-State {
+        position: absolute;
+        width: 28px;
+        height: 28px;
+        background-repeat: no-repeat;
+        background-size: 18px 18px;
+        background-position: center;
+        margin-left: 9px;
+        margin-top: -3px;
+    }
+	
+	.Pause{
+		display:none!important;
+	}

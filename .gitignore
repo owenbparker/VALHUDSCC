@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+config.json
+config.json.tmp
+output/
+logos/
+smoke-test.txt
+overlay-test*
+build/
+dist/

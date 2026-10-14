@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="icon" href="assets/app_icon.png">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VALORANT HUD Control</title>
+<style>
+  @font-face { font-family: "Inter"; src: url("fonts/Inter.ttf") format("truetype"); font-weight: 100 900; }
+  :root { --bg: #0e1012; --panel: #171a1d; --line: #2a2f34; --text: #e8eaed; --muted: #8b939b;
+          --left: #2fc7a6; --right: #e3475a; --accent: #31c392; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 "Inter", system-ui, sans-serif; }
+  html, body { height: 100%; }
+  header { display: flex; align-items: center; gap: 14px; height: 54px; padding: 0 18px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .clock { font-variant-numeric: tabular-nums; color: var(--text); font-weight: 600; }
+  .badge { font-size: 11px; font-weight: 700; letter-spacing: .06em; padding: 3px 8px; border-radius: 4px; background: #ffcf66; color: #1a1a1a; }
+  .badge:empty { display: none; }
+  .version { font-size: 12px; color: var(--muted); }
+  .update.check { background: #252a2f; color: var(--text); border: 1px solid var(--line); font-weight: 600; }
+  .update.check:hover { filter: none; border-color: var(--muted); }
+  .update { background: var(--accent); color: #06231a; border: 0; font-weight: 700; padding: 6px 12px; }
+  .update:hover { filter: brightness(1.1); }
+  .update[disabled] { background: #2c3a35; color: var(--text); cursor: default; }
+  .update.error { background: #6b2a2a; color: #fff; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: transparent; padding: 6px 12px; color: var(--muted); }
+  .seg button.on { background: var(--accent); color: #06231a; font-weight: 600; }
+  /* Desktop layout: settings scroll on the left, preview / outputs / log on the right. */
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 440px; height: calc(100% - 54px); }
+  .layout > main, .layout > aside { overflow-y: auto; }
+  aside { border-left: 1px solid var(--line); padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .out { margin-bottom: 10px; }
+  .out > span { display: block; color: var(--muted); font-size: 12px; margin-bottom: 4px; }
+  .out .row { align-items: stretch; }
+  .out code { display: flex; align-items: center; padding: 6px 8px; min-width: 0; }
+  .out button { flex: 0 0 auto; }
+  .toggle { display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; margin: 6px 0 10px; cursor: pointer; }
+  .toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .log { height: 190px; overflow-y: auto; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px;
+         font: 12px/1.5 ui-monospace, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+  .log .t { color: var(--muted); margin-right: 6px; }
+  .log .warn { color: #ffcf66; }
+  .log .error { color: #ff7b7b; }
+  @media (max-width: 900px) { .layout { display: block; height: auto; } aside { border-left: 0; } }
+  header h1 { margin: 0; font-size: 16px; font-weight: 700; }
+  .status { display: flex; align-items: center; gap: 8px; color: var(--muted); white-space: nowrap; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: #c0392b; }
+  .dot.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+  main { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; padding: 16px; align-content: start; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  label { display: block; margin: 10px 0 4px; color: var(--muted); font-size: 12px; }
+  input, select { width: 100%; padding: 8px 10px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  input[type=checkbox] { width: auto; }
+  input.swatch { flex: 0 0 64px; height: 38px; padding: 3px; cursor: pointer; }
+  input[type=range] { padding: 0; border: 0; background: none; accent-color: var(--accent); }
+  .logo-adjust label span { color: var(--text); float: right; }
+  button { padding: 8px 12px; background: #252a2f; color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--muted); }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row > * { flex: 1; }
+  .teams { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .team { border-top: 4px solid var(--left); padding-top: 8px; }
+  .team.right { border-top-color: var(--right); }
+  .team img { width: 48px; height: 48px; object-fit: contain; background: #000; border-radius: 6px; flex: 0 0 48px; }
+  .wins { display: flex; align-items: center; gap: 8px; }
+  .wins b { font-size: 22px; min-width: 28px; text-align: center; }
+  .wins button { flex: 0 0 40px; font-size: 18px; padding: 4px; }
+  .preview { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #2f3d2c url("hud/Resources/Maps/Ascent.png") center/cover; border-radius: 6px; overflow: hidden; }
+  .preview iframe { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; border: 0; transform-origin: 0 0; }
+  code { background: var(--bg); padding: 2px 6px; border-radius: 4px; font-size: 12px; word-break: break-all; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 4px 12px; font-size: 12px; max-height: 320px; overflow: auto; }
+  .fields div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; cursor: copy; }
+  .fields span:last-child { color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
+  .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .checks label { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 0; color: var(--text); font-size: 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  .checks input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .checks .dot { width: 18px; height: 18px; box-shadow: none; display: inline-grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; }
+  .warn { color: #ffcf66; }
+  .screen-result { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  .screen-result figure { margin: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px; }
+  .screen-result img { width: 100%; image-rendering: pixelated; background: #fff; border-radius: 3px; }
+  .screen-result figcaption { font-size: 12px; margin-top: 4px; }
+  .ok { color: var(--accent); }
+  .report { margin-top: 10px; padding: 10px 12px; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  .report .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .report .chips span { background: #252a2f; border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+  details ul { margin: 6px 0 0; padding-left: 18px; }
+  .bg-video { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .bg-video label span { color: var(--text); float: right; }
+  details li { margin-bottom: 4px; }
+  @media (max-width: 600px) { .teams { grid-template-columns: 1fr; } }
+  .players { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .players .p { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; align-items: center; margin-bottom: 6px; }
+  .players .p img { width: 28px; height: 28px; border-radius: 4px; background: #000; object-fit: cover; }
+  .players .p small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .maps .row { margin-bottom: 6px; }
+  .maps .row > span { flex: 0 0 52px; color: var(--muted); font-size: 12px; }
+  .maps input[type=radio] { flex: 0 0 auto; width: auto; accent-color: var(--accent); }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btns button.on { background: var(--accent); color: #06231a; border-color: var(--accent); font-weight: 600; }
+  .feed { font-size: 13px; }
+  .feed code { display: inline; }
+</style>
+</head>
+<body>
+<header>
+  <h1>VALORANT HUD</h1>
+  <div class="status"><span class="dot" id="dot"></span><span id="status">Connecting…</span></div>
+  <div class="seg" id="mode" role="group" aria-label="Game source">
+    <button data-mode="live">Live feed</button><button data-mode="demo">Demo match</button>
+  </div>
+  <select id="demo-speed" title="Demo speed" style="width:auto">
+    <option value="1">1x</option><option value="4">4x</option><option value="8">8x</option><option value="20">20x</option>
+  </select>
+  <div class="seg" id="ow" hidden title="Draws the HUD in a see-through window over the whole screen, on top of VALORANT. Clicks go through it to the game. Set VALORANT to Windowed Fullscreen or Windowed (not Fullscreen).">
+    <button id="ow-btn">Show HUD on game</button>
+    <select id="ow-screen" title="Which screen the HUD covers" style="width:auto;border:0;border-left:1px solid var(--line);border-radius:0"></select>
+  </div>
+  <div class="status" style="margin-left:auto">
+    <button id="update" class="update" hidden></button>
+    <span class="version" id="version"></span>
+    <span class="badge" id="mode-badge"></span><span id="clock" class="clock">R0 0:00</span>
+    <a href="/start" class="version" style="text-decoration:none" title="Back to the GFX Controller / Observer Client choice">Change client</a>
+  </div>
+</header>
+<div class="layout">
+<main>
+  <section class="wide">
+    <h2>Teams</h2>
+    <div class="teams"><div class="team left" data-side="left"></div><div class="team right" data-side="right"></div></div>
+  </section>
+
+  <section>
+    <h2>Series &amp; maps</h2>
+    <div class="row">
+      <div><label>Best of</label><select id="best-of"><option value="1">1</option><option value="3">3</option><option value="5">5</option></select></div>
+      <div><label>Attacks first</label><select id="attack-first"><option value="left">Left team</option><option value="right">Right team</option></select></div>
+    </div>
+    <label>Maps (pick the one being played; set the winner when a map ends)</label>
+    <div class="maps" id="maps"></div>
+  </section>
+
+  <section>
+    <h2>Broadcast</h2>
+    <label>Timeouts left</label>
+    <div class="row">
+      <div class="wins"><button data-to="left" data-d="-1">−</button><b id="to-left">2</b><button data-to="left" data-d="1">+</button></div>
+      <div class="wins"><button data-to="right" data-d="-1">−</button><b id="to-right">2</b><button data-to="right" data-d="1">+</button></div>
+    </div>
+    <label>On screen</label>
+    <div class="btns">
+      <button id="call-left">Timeout: left team</button>
+      <button id="call-right">Timeout: right team</button>
+      <button id="tech-pause">Technical pause</button>
+      <button id="show-scoreboard" title="Keeps the scoreboard overlay (/scoreboard) on screen; otherwise it shows itself in the buy phase">Show scoreboard</button>
+    </div>
+    <label class="toggle" style="margin-top:12px"><input type="checkbox" id="show-timeouts"> Timeout diamonds under the score</label>
+  </section>
+
+  <section class="wide">
+    <h2>Players</h2>
+    <p class="note" style="margin:0 0 8px">Names typed here replace the ones from the game. Leave blank to use the game's.</p>
+    <div class="players"><div id="players-left"></div><div id="players-right"></div></div>
+  </section>
+
+  <section class="wide">
+    <h2>Live data</h2>
+    <div class="feed" id="feed"></div>
+    <details class="note" style="margin-top:8px">
+      <summary>Sending live data to the HUD</summary>
+      <p>Anything that reads the match can POST JSON to <code>/api/ingest</code> on this PC, e.g.
+      <code>{"source": "reader", "match": {"round": 5, "phase": "combat", "score": {"left": 3, "right": 1}},
+      "players": [{"team": "left", "slot": 1, "agent": "Jett", "health": 80, "credits": 2300}]}</code>.
+      Only the fields that changed need sending. The full list is in the README.</p>
+    </details>
+  </section>
+</main>
+<aside>
+  <section>
+    <h2>Preview</h2>
+    <div class="preview" id="preview"><iframe src="/overlay" title="Overlay preview"></iframe></div>
+  </section>
+
+  <section>
+    <h2>Outputs</h2>
+    <div class="out"><span>HUD overlay (OBS / vMix browser source, 1920×1080)</span>
+      <div class="row"><code id="url-overlay"></code><button data-copy="url-overlay">Copy</button></div></div>
+    <div class="out"><span>Scoreboard overlay (shows itself in the buy phase)</span>
+      <div class="row"><code id="url-scoreboard"></code><button data-copy="url-scoreboard">Copy</button></div></div>
+    <div class="out"><span>vMix data source (CSV; also /hud.json, /hud.xml)</span>
+      <div class="row"><code id="url-csv"></code><button data-copy="url-csv">Copy</button></div></div>
+    <div class="out"><span>CSV / JSON / XML files</span>
+      <div class="row"><code id="out-dir"></code><button data-open="output">Open folder</button></div></div>
+    <label class="toggle"><input type="checkbox" id="network"> Let other PCs on the network read the HUD</label>
+    <div class="out" id="lan-row" hidden><span>From another PC</span>
+      <div class="row"><code id="url-lan"></code><button data-copy="url-lan">Copy</button></div></div>
+  </section>
+
+  <section>
+    <h2>Log</h2>
+    <div class="log" id="log"></div>
+  </section>
+</aside>
+</div>
+<script src="update.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let state = null;
+const MAPS = ["Abyss", "Ascent", "Bind", "Breeze", "Corrode", "Fracture", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
+
+async function post(url, body) {
+  const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const data = await r.json();
+  if (data.error) alert(data.error); else apply(data);
+}
+function setIfIdle(el, value) { if (document.activeElement !== el) el.value = value; }
+
+// Teams.
+function teamForm(side) {
+  return `
+    <div class="row"><img id="${side}-logo-img" alt="">
+      <div><label>Tricode</label><input data-k="tricode" maxlength="5"></div></div>
+    <label>Team name</label><input data-k="name">
+    <label>Logo</label>
+    <div class="row"><select data-k="logo" id="${side}-logo"></select>
+      <button type="button" onclick="document.getElementById('${side}-upload').click()" style="flex:0 0 auto">Upload…</button>
+      <input type="file" id="${side}-upload" accept="image/*" hidden></div>
+    <label>Series wins</label>
+    <div class="wins"><button data-w="-1">−</button><b id="${side}-wins">0</b><button data-w="1">+</button></div>`;
+}
+for (const el of document.querySelectorAll(".team")) {
+  const side = el.dataset.side;
+  el.innerHTML = teamForm(side);
+  el.querySelectorAll("[data-k]").forEach(input => input.addEventListener("change", () =>
+    post("/api/config", { [side]: { [input.dataset.k]: input.value } })));
+  el.querySelectorAll("[data-w]").forEach(b => b.addEventListener("click", () =>
+    post("/api/config", { [side]: { wins: Math.max(0, state.config[side].wins + Number(b.dataset.w)) } })));
+  $(`${side}-upload`).addEventListener("change", e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => post("/api/logo", { side, filename: file.name, data: reader.result.split(",")[1] });
+    reader.readAsDataURL(file);
+  });
+}
+async function loadLogos(cfg) {
+  const logos = await (await fetch("/api/logos")).json();
+  for (const side of ["left", "right"]) {
+    const sel = $(`${side}-logo`), current = cfg[side].logo;
+    sel.innerHTML = [...new Set([current, ...logos])].map(l => `<option value="${l}">${l.split("/").pop()}</option>`).join("");
+    sel.value = current;
+  }
+}
+
+// Series and maps.
+$("best-of").onchange = e => {
+  const n = Number(e.target.value), maps = state.config.maps.slice(0, n);
+  while (maps.length < n) maps.push({ name: MAPS[maps.length % MAPS.length], winner: "" });
+  post("/api/config", { best_of: n, maps, current_map: Math.min(state.config.current_map, n - 1) });
+};
+$("attack-first").onchange = e => post("/api/config", { attack_first: e.target.value });
+function renderMaps(cfg) {
+  const box = $("maps");
+  const key = JSON.stringify([cfg.maps, cfg.current_map, cfg.left.tricode, cfg.right.tricode]);
+  if (box.dataset.key === key || box.contains(document.activeElement)) return;
+  box.dataset.key = key;
+  box.innerHTML = cfg.maps.map((m, i) => `
+    <div class="row">
+      <input type="radio" name="current-map" value="${i}" ${i === cfg.current_map ? "checked" : ""} title="Being played">
+      <span>Map ${i + 1}</span>
+      <select data-map="${i}">${MAPS.map(n => `<option ${n === m.name ? "selected" : ""}>${n}</option>`).join("")}</select>
+      <select data-winner="${i}">
+        <option value="" ${!m.winner ? "selected" : ""}>Not played yet</option>
+        <option value="left" ${m.winner === "left" ? "selected" : ""}>Won by ${cfg.left.tricode}</option>
+        <option value="right" ${m.winner === "right" ? "selected" : ""}>Won by ${cfg.right.tricode}</option>
+      </select>
+    </div>`).join("");
+  const maps = () => state.config.maps.map(m => ({ ...m }));
+  box.querySelectorAll("[data-map]").forEach(s => s.onchange = () => {
+    const list = maps(); list[s.dataset.map].name = s.value; post("/api/config", { maps: list });
+  });
+  box.querySelectorAll("[data-winner]").forEach(s => s.onchange = () => {
+    const list = maps(); list[s.dataset.winner].winner = s.value; post("/api/config", { maps: list });
+  });
+  box.querySelectorAll("[name=current-map]").forEach(r => r.onchange = () => post("/api/config", { current_map: Number(r.value) }));
+}
+
+// Broadcast controls.
+document.querySelectorAll("[data-to]").forEach(b => b.addEventListener("click", () => {
+  const side = b.dataset.to, n = Math.max(0, Math.min(2, state.config.timeouts[side] + Number(b.dataset.d)));
+  post("/api/config", { timeouts: { [side]: n } });
+}));
+for (const side of ["left", "right"])
+  $(`call-${side}`).onclick = () => {
+    const calling = state.config.timeout_call === side;
+    const change = { timeout_call: calling ? "" : side, tech_pause: false };
+    // Calling a timeout uses one up.
+    if (!calling && state.config.timeouts[side] > 0) change.timeouts = { [side]: state.config.timeouts[side] - 1 };
+    post("/api/config", change);
+  };
+$("tech-pause").onclick = () => post("/api/config", { tech_pause: !state.config.tech_pause, timeout_call: "" });
+$("show-scoreboard").onclick = () => post("/api/config", { show: { scoreboard: !state.config.show.scoreboard } });
+$("show-timeouts").onchange = e => post("/api/config", { show: { timeouts: e.target.checked } });
+
+// Players.
+for (const side of ["left", "right"]) {
+  $(`players-${side}`).innerHTML = [1, 2, 3, 4, 5].map(i => `
+    <div class="p"><img id="pimg-${side}-${i}" alt=""><input id="pname-${side}-${i}" placeholder="Player ${i}"><small id="pinfo-${side}-${i}"></small></div>`).join("");
+  for (let i = 1; i <= 5; i++)
+    $(`pname-${side}-${i}`).addEventListener("change", () => {
+      const names = [1, 2, 3, 4, 5].map(n => $(`pname-${side}-${n}`).value.trim());
+      post("/api/config", { player_names: { [side]: names } });
+    });
+}
+
+function apply(s) {
+  const first = !state;
+  state = s;
+  const cfg = s.config, g = s.game, m = g.match, app = s.app;
+  $("dot").classList.toggle("on", g.connected);
+  $("status").textContent = g.connected ? `${m.map || "Match"} - ${m.phase || "live"}` : app.mode === "live" ? "Waiting for live data…" : "Starting…";
+  $("clock").textContent = `R${m.round} ${Math.floor(m.timer / 60)}:${String(Math.floor(m.timer % 60)).padStart(2, "0")}`;
+  for (const side of ["left", "right"]) {
+    const el = document.querySelector(`.team[data-side=${side}]`);
+    el.querySelectorAll("[data-k]").forEach(input => setIfIdle(input, cfg[side][input.dataset.k]));
+    $(`${side}-wins`).textContent = cfg[side].wins;
+    $(`${side}-logo-img`).src = "/" + cfg[side].logo;
+    $(`to-${side}`).textContent = cfg.timeouts[side];
+    $(`call-${side}`).classList.toggle("on", cfg.timeout_call === side);
+    $(`call-${side}`).textContent = `Timeout: ${cfg[side].tricode}`;
+    for (let i = 1; i <= 5; i++) {
+      const p = g.players.find(p => p.team === side && p.slot === i);
+      setIfIdle($(`pname-${side}-${i}`), (cfg.player_names[side] || [])[i - 1] || "");
+      $(`pname-${side}-${i}`).placeholder = p.name || `Player ${i}`;
+      const img = p.agent ? `/hud/Resources/Agentes/${p.agent}/${p.agent}.png` : "";
+      if ($(`pimg-${side}-${i}`).getAttribute("src") !== img) $(`pimg-${side}-${i}`).setAttribute("src", img);
+      $(`pinfo-${side}-${i}`).textContent = p.agent ? `${p.alive ? p.health + " HP" : "dead"} · ¤${p.credits} · ${p.kills}/${p.deaths}/${p.assists}` : "";
+    }
+  }
+  if (first) loadLogos(cfg);
+  setIfIdle($("best-of"), String(cfg.best_of));
+  setIfIdle($("attack-first"), cfg.attack_first);
+  renderMaps(cfg);
+  $("tech-pause").classList.toggle("on", cfg.tech_pause);
+  $("show-scoreboard").classList.toggle("on", cfg.show.scoreboard);
+  $("show-timeouts").checked = cfg.show.timeouts !== false;
+  const f = app.feed;
+  $("feed").innerHTML = f.updates
+    ? `${f.updates} updates received; last ${f.age}s ago. Sources: ` + Object.entries(f.sources).map(([k, v]) => `<code>${k}</code> (${v}s ago)`).join(", ")
+    : "No live data received yet. The screen reader isn't built yet: for now use <b>Demo match</b>, or send data to <code>/api/ingest</code>.";
+
+  showUpdate(app.update);
+  if (first) {
+    $("url-overlay").textContent = `http://localhost:${app.port}/overlay`;
+    $("url-scoreboard").textContent = `http://localhost:${app.port}/scoreboard`;
+    $("url-csv").textContent = `http://localhost:${app.port}/hud.csv`;
+    $("out-dir").textContent = s.output_dir;
+    if (app.role !== "gfx") fetch("/api/role", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"role":"gfx"}' }).catch(() => {});
+  }
+  document.querySelectorAll("#mode button").forEach(b => b.classList.toggle("on", b.dataset.mode === app.mode));
+  $("mode-badge").textContent = app.mode === "live" ? "" : app.mode.toUpperCase();
+  $("demo-speed").hidden = app.mode !== "demo";
+  setIfIdle($("demo-speed"), String(app.demo_speed));
+  const ow = app.overlay_window;
+  $("ow").hidden = !ow.available;
+  if (ow.available) {
+    $("ow-btn").classList.toggle("on", ow.open);
+    $("ow-btn").textContent = ow.open ? "HUD on game: on" : "Show HUD on game";
+    const opts = ow.screens.map((label, i) => `<option value="${i}">${label}</option>`).join("");
+    if ($("ow-screen").dataset.opts !== opts) { $("ow-screen").innerHTML = opts; $("ow-screen").dataset.opts = opts; }
+    $("ow-screen").hidden = ow.screens.length < 2;
+    setIfIdle($("ow-screen"), String(ow.screen));
+  }
+  $("network").checked = app.network;
+  $("lan-row").hidden = !app.lan_url;
+  $("url-lan").textContent = app.lan_url ? `${app.lan_url}/overlay` : "";
+}
+const showUpdate = updateButton($("update"), $("version"));
+
+document.querySelectorAll("#mode button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.mode !== state?.app.mode) post("/api/mode", { mode: b.dataset.mode, speed: Number($("demo-speed").value) });
+}));
+$("demo-speed").onchange = e => post("/api/mode", { mode: "demo", speed: Number(e.target.value) });
+$("ow-btn").onclick = () => post("/api/overlay-window", { open: !state.app.overlay_window.open });
+$("ow-screen").onchange = e => post("/api/overlay-window", { open: state.app.overlay_window.open, screen: Number(e.target.value) });
+
+// Outputs.
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  const t = document.createElement("textarea");
+  t.value = text; document.body.appendChild(t); t.select(); document.execCommand("copy"); t.remove();
+}
+document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => {
+  copyText($(b.dataset.copy).textContent);
+  const label = b.textContent; b.textContent = "Copied"; setTimeout(() => b.textContent = label, 1200);
+}));
+document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => post("/api/open", { folder: b.dataset.open })));
+$("network").onchange = e => post("/api/network", { enabled: e.target.checked });
+
+// Log.
+let logAfter = 0;
+async function pollLog() {
+  try {
+    const lines = await (await fetch(`/api/log?after=${logAfter}`, { cache: "no-store" })).json();
+    if (lines.length) {
+      const box = $("log"), atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 20;
+      for (const l of lines) {
+        const row = document.createElement("div");
+        row.className = l.level;
+        row.innerHTML = `<span class="t">${l.time}</span>`;
+        row.append(l.message);
+        box.appendChild(row);
+        logAfter = l.id;
+      }
+      while (box.childElementCount > 500) box.firstChild.remove();
+      if (atBottom) box.scrollTop = box.scrollHeight;
+    }
+  } catch (e) { /* app closing */ }
+  setTimeout(pollLog, 1000);
+}
+pollLog();
+
+function fitPreview() {
+  const box = $("preview");
+  box.querySelector("iframe").style.transform = `scale(${box.clientWidth / 1920})`;
+}
+new ResizeObserver(fitPreview).observe($("preview"));
+fitPreview();
+
+async function poll() {
+  try { apply(await (await fetch("/api/state", { cache: "no-store" })).json()); }
+  catch (e) { $("dot").classList.remove("on"); $("status").textContent = "HUD app not running"; }
+  setTimeout(poll, 1000);
+}
+poll();
+</script>
+</body>
+</html>

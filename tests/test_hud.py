@@ -1,0 +1,134 @@
+import json
+import os
+import tempfile
+import threading
+import unittest
+import urllib.request
+
+from valhud import game
+from valhud.config import DEFAULTS, Config, web_file
+from valhud.demo import DemoGame
+
+
+class GameTests(unittest.TestCase):
+    def test_merge_partial_update(self):
+        s = game.merge(game.empty_state(), {
+            "match": {"round": 5, "phase": "combat", "score": {"left": 3}},
+            "players": [{"team": "right", "slot": 2, "agent": "KAY/O", "health": 140, "weapon": "vandal",
+                         "shield": 30, "abilities": {"Q": [1, 2]}}]})
+        self.assertEqual(s["match"]["round"], 5)
+        self.assertEqual(s["match"]["score"], {"left": 3, "right": 0})
+        p = s["players"][6]
+        self.assertEqual((p["team"], p["slot"]), ("right", 2))
+        self.assertEqual(p["agent"], "Kayo")          # our folder name
+        self.assertEqual(p["ult_max"], game.ULT_MAX["Kayo"])
+        self.assertEqual(p["health"], 100)           # clamped
+        self.assertEqual(p["weapon"], "Vandal")
+        self.assertEqual(p["shield"], 25)            # only 0 / 25 / 50
+        self.assertEqual(p["abilities"]["Q"], [1, 2])
+        self.assertEqual(p["abilities"]["C"], [0, 1])  # untouched
+
+    def test_health_zero_means_dead(self):
+        s = game.merge(game.empty_state(), {"players": [{"team": "left", "slot": 1, "health": 0}]})
+        self.assertFalse(s["players"][0]["alive"])
+
+    def test_bad_players_ignored(self):
+        s = game.merge(game.empty_state(), {"players": [{"team": "blue", "slot": 1, "health": 1},
+                                                        {"team": "left", "slot": 9, "health": 1}]})
+        self.assertTrue(all(p["health"] == 100 for p in s["players"]))
+
+    def test_typed_names_win(self):
+        cfg = json.loads(json.dumps(DEFAULTS))
+        cfg["player_names"]["left"][0] = "TenZ"
+        s = game.merge(game.empty_state(), {"players": [{"team": "left", "slot": 1, "name": "feedname"},
+                                                        {"team": "left", "slot": 2, "name": "other"}]})
+        s = game.with_overrides(s, cfg)
+        self.assertEqual(s["players"][0]["name"], "TenZ")
+        self.assertEqual(s["players"][1]["name"], "other")
+
+    def test_fields(self):
+        f = game.fields(game.empty_state(), DEFAULTS)
+        for key in ("SCORE LEFT", "TEAM RIGHT", "LEFT P1 HP", "RIGHT P5 CREDITS", "ROUND", "SPIKE"):
+            self.assertIn(key, f)
+
+
+class DemoTests(unittest.TestCase):
+    def test_plays_a_whole_match(self):
+        d = DemoGame(seed=3)
+        winners, seen_plant, sides = set(), False, set()
+        for _ in range(20000):
+            d.advance(1)
+            m = d.state["match"]
+            seen_plant |= m["spike"]["state"] == "planted"
+            sides.add((m["round"] > 12, m["attackers"]))
+            for p in d.state["players"]:
+                self.assertTrue(0 <= p["health"] <= 100)
+                self.assertTrue(0 <= p["credits"] <= 9000)
+                self.assertLessEqual(p["ult_points"], p["ult_max"])
+            if max(m["score"].values()) >= 13 and m["phase"] == "end":
+                winners.add(max(m["score"], key=m["score"].get))
+                break
+        self.assertTrue(winners, "the demo match should finish")
+        self.assertTrue(seen_plant)
+        self.assertIn((False, "left"), sides)
+        self.assertIn((True, "right"), sides)   # sides swap at half time
+        self.assertEqual(len(m["rounds"]), m["score"]["left"] + m["score"]["right"])
+
+
+class ServerTests(unittest.TestCase):
+    def test_ingest_and_state(self):
+        from valhud.app import HudApp, start
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Config(os.path.join(tmp, "config.json"))
+            cfg.update({"http_port": 8795, "output_dir": os.path.join(tmp, "out")})
+            app = HudApp(cfg)
+            app.updater.check_in_background = lambda: None
+            start(app)
+            try:
+                def post(path, body):
+                    req = urllib.request.Request(f"http://127.0.0.1:8795{path}", json.dumps(body).encode(),
+                                                 {"Content-Type": "application/json"})
+                    return json.loads(urllib.request.urlopen(req, timeout=5).read())
+
+                post("/api/ingest", {"source": "test", "match": {"map": "Bind", "round": 3},
+                                     "players": [{"team": "left", "slot": 1, "agent": "Jett", "credits": 4200}]})
+                state = json.loads(urllib.request.urlopen("http://127.0.0.1:8795/api/state", timeout=5).read())
+                self.assertTrue(state["game"]["connected"])
+                self.assertEqual(state["game"]["match"]["map"], "Bind")
+                self.assertEqual(state["game"]["players"][0]["credits"], 4200)
+                self.assertIn("test", state["app"]["feed"]["sources"])
+                csv = urllib.request.urlopen("http://127.0.0.1:8795/hud.csv", timeout=5).read().decode()
+                self.assertIn("LEFT P1 CREDITS", csv)
+                for path in ("/overlay", "/scoreboard"):
+                    page = urllib.request.urlopen(f"http://127.0.0.1:8795{path}", timeout=5)
+                    self.assertIn("/Console.html", page.geturl())
+                    self.assertIn(b"/driver.js", page.read())
+            finally:
+                app.stop()
+
+
+class FileTests(unittest.TestCase):
+    def test_template_paths(self):
+        # The templates use both "Resources" and "resources".
+        self.assertTrue(web_file("hud/resources/Logos/banner1.png"))
+        self.assertTrue(web_file("hud/Resources/Agentes/Jett/Jett.png"))
+        # The scoreboard borrows the HUD's agent images.
+        self.assertTrue(web_file("scoreboard/Resources/Agentes/Kayo/X.png"))
+        self.assertTrue(web_file("scoreboard/resources/logos/Elimination.png"))
+        self.assertIsNone(web_file("hud/../../valhud/config.py"))
+
+    def test_every_agent_and_weapon_has_images(self):
+        for agent in game.AGENTS:
+            for f in (agent, "C", "Q", "E", "X"):
+                self.assertTrue(web_file(f"hud/Resources/Agentes/{agent}/{f}.png"), f"{agent}/{f}")
+        for weapon in game.WEAPONS:
+            self.assertTrue(web_file(f"hud/Resources/Armas/{weapon}.png"), weapon)
+
+    def test_gfx_address(self):
+        from valhud.overlay_window import gfx_base_url
+        self.assertEqual(gfx_base_url("192.168.2.40"), "http://192.168.2.40:8778")
+        self.assertEqual(gfx_base_url("http://192.168.2.40:8778/overlay"), "http://192.168.2.40:8778")
+
+
+if __name__ == "__main__":
+    unittest.main()
