@@ -422,7 +422,7 @@ def read_scoreboard(frame, ocr):
         for r in range(5):
             cell = lambda c: _fit(ink(row_cell(frame, side, r, c, 3), 1, 150))
             lines.append(_line([_label("kills", h), cell("k"), _label("deaths", h), cell("d"),
-                                _label("assists", h), cell("a"), _label("ult", h), cell("ult_have"), _label("of", h), cell("ult_need"),
+                                _label("assists", h), cell("a"), _label("ult", h), cell("ult_have"), _label("needs", h), cell("ult_need"),
                                 _label("creds", h), _fit(_drop_currency(ink(row_cell(frame, side, r, "creds", 3), 1, 150))),
                                 _label("end", h)], h))
             keys.append((side, r))
@@ -433,7 +433,11 @@ def read_scoreboard(frame, ocr):
         info["_text"] = text
         info["k"], info["d"], info["a"] = _field(text, "kills"), _field(text, "deaths"), _field(text, "assists")
         info["creds"] = _field(text, "creds")
-        have, need = _field(text, "ult"), _field(text, "of")
+        have, need = _field(text, "ult"), _field(text, "needs")
+        if need is None:  # the label went missing: "ult 0 7"
+            m = re.search(r"ult\W*" + _NUM + r"\W+" + _NUM, text, re.I)
+            if m:
+                have, need = number(m.group(1)), number(m.group(2))
         info["ult"] = (have, need) if have is not None and need is not None and have <= need <= 9 else None
     return rows
 
