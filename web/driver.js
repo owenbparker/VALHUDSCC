@@ -122,6 +122,11 @@
 
   if (params.get("fit") === "1") {
     // Scale with the screen's height, centred, like the game's own HUD.
+    // The template paints its top bar as the page background, which a
+    // transform doesn't scale; keep that background on a 1920x1080 body
+    // (an almost-invisible page background stops it moving to the page).
+    document.documentElement.style.background = "rgba(0,0,0,0.004)";
+    Object.assign(document.body.style, { width: "1920px", height: "1080px", margin: "0", position: "relative" });
     var fit = function () {
       var k = Math.min(innerHeight / 1080, innerWidth / 1920);
       var root = document.documentElement.style;

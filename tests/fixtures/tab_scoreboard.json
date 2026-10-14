@@ -1,0 +1,13 @@
+{"match": {"score": {"left": 0, "right": 0}, "timer": 24, "round": 1, "scoreboard_open": true},
+ "players": [
+  {"team": "left", "slot": 1, "agent": "Vyse", "alive": true, "health": 100, "name": "lilzahzah", "weapon": "Classic", "credits": 300, "ult_points": 0, "ult_max": 8, "kills": 0, "deaths": 0, "assists": 0, "shield": 0},
+  {"team": "left", "slot": 2, "agent": "Sova", "alive": true, "health": 100, "name": "Jerk", "weapon": "Ghost", "credits": 0, "ult_points": 0, "ult_max": 8, "shield": 0},
+  {"team": "left", "slot": 3, "agent": "Kayo", "alive": true, "health": 100, "name": "peroR", "weapon": "Ghost", "credits": 50, "ult_points": 0, "ult_max": 8, "shield": 0},
+  {"team": "left", "slot": 4, "agent": "Iso", "alive": true, "health": 100, "name": "Babooshka", "weapon": "Ghost", "credits": 100, "ult_points": 0, "ult_max": 7, "shield": 0},
+  {"team": "left", "slot": 5, "agent": "Omen", "alive": true, "health": 100, "name": "m0skito", "weapon": "Classic", "credits": 800, "ult_points": 0, "ult_max": 7, "shield": 0},
+  {"team": "right", "slot": 1, "agent": "Clove", "alive": true, "health": 100, "name": "ru1ner", "weapon": "Classic", "credits": 50, "ult_points": 0, "ult_max": 8, "shield": 25},
+  {"team": "right", "slot": 2, "agent": "Killjoy", "alive": true, "health": 100, "name": "arj", "weapon": "Ghost", "credits": 100, "ult_points": 0, "ult_max": 9, "shield": 0},
+  {"team": "right", "slot": 3, "agent": "Jett", "alive": true, "health": 100, "name": "Exly", "weapon": "Ghost", "credits": 100, "ult_points": 0, "ult_max": 8, "shield": 0},
+  {"team": "right", "slot": 4, "agent": "Kayo", "alive": true, "health": 100, "name": "introvert ツ", "weapon": "Classic", "credits": 100, "ult_points": 0, "ult_max": 8, "shield": 0},
+  {"team": "right", "slot": 5, "agent": "Sova", "alive": true, "health": 100, "name": "FalcoN", "weapon": "Ghost", "credits": 0, "ult_points": 0, "ult_max": 8, "shield": 0}
+ ]}

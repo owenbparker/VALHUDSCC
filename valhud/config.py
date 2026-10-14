@@ -29,6 +29,8 @@ DEFAULTS = {
     # still only be made on this PC).
     "allow_network": False,
     "output_dir": "output",
+    # Read the match off the VALORANT spectator screen on this PC.
+    "screen_reader": False,
     # How long live data (from /api/ingest) counts as current, in seconds.
     "live_timeout": 10,
 

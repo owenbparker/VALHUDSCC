@@ -37,6 +37,12 @@ jobs:
       - name: Run tests
         run: python -m unittest discover -s tests -v
 
+      - name: Read a real spectator screenshot (agents, weapons, text)
+        # The Tab scoreboard open: every player's agent, name, weapon, credits, ult and K/D/A.
+        run: |
+          python -m valhud.reader tests/fixtures/tab_scoreboard.png --expect tests/fixtures/tab_scoreboard.json
+          if ($LASTEXITCODE) { exit 1 }
+
       - name: Stamp the version
         shell: pwsh
         run: |

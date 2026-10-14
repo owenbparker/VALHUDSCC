@@ -61,6 +61,8 @@
       <button id="show">Show HUD on game</button>
       <select id="screen" title="Which screen the HUD covers" hidden></select>
     </div>
+    <label class="toggle" style="display:flex;gap:8px;align-items:center;margin-top:16px;font-size:13px"><input type="checkbox" id="reader" style="width:auto"> Read VALORANT on this PC and send it to the GFX PC</label>
+    <p class="note" id="reader-status" style="margin-top:4px"></p>
     <p class="note" id="note"></p>
   </section>
 </main>
@@ -81,6 +83,10 @@ function apply(s) {
   state = s;
   showUpdate(s.app.update);
   if (first || document.activeElement !== $("url")) $("url").value = s.config.observer_url || "";
+  const rd = s.app.reader;
+  $("reader").checked = rd.enabled;
+  $("reader").disabled = !rd.available;
+  $("reader-status").textContent = !rd.available ? rd.status : rd.enabled ? rd.status : "";
   const ow = s.app.overlay_window;
   $("show").disabled = !ow.available;
   $("show").classList.toggle("on", !!ow.open);
@@ -114,6 +120,7 @@ async function check() {
   }
 }
 
+$("reader").onchange = e => post("/api/reader", { enabled: e.target.checked });
 $("url").addEventListener("input", () => { clearTimeout(checkTimer); checkTimer = setTimeout(check, 600); });
 $("url").addEventListener("change", () => post("/api/config", { observer_url: $("url").value.trim() }));
 $("show").onclick = () => {

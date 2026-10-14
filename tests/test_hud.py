@@ -107,6 +107,32 @@ class ServerTests(unittest.TestCase):
                 app.stop()
 
 
+class ReaderTests(unittest.TestCase):
+    def test_reads_tab_scoreboard_screenshot(self):
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        from PIL import Image
+        from valhud.reader import TEXT_FIELDS, read_frame
+        here = os.path.join(os.path.dirname(__file__), "fixtures")
+        with open(os.path.join(here, "tab_scoreboard.json"), encoding="utf-8") as f:
+            expected = json.load(f)
+        update = read_frame(Image.open(os.path.join(here, "tab_scoreboard.png")))  # no text recognition here
+        by_slot = {(p["team"], p["slot"]): p for p in update["players"]}
+        for e in expected["players"]:
+            p = by_slot[(e["team"], e["slot"])]
+            for key, value in e.items():
+                if key not in ("team", "slot") and key not in TEXT_FIELDS:
+                    self.assertEqual(p.get(key), value, f"{e['team']} {e['slot']} {key}")
+        self.assertEqual(update["match"]["spike"]["state"], "")
+        self.assertTrue(update["match"]["scoreboard_open"])
+
+    def test_feed_turns_into_state(self):
+        s = game.merge(game.empty_state(), {"players": [{"team": "left", "slot": 3, "alive": False, "health": 0}]})
+        self.assertFalse(s["players"][2]["alive"])
+
+
 class FileTests(unittest.TestCase):
     def test_template_paths(self):
         # The templates use both "Resources" and "resources".

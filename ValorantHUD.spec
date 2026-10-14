@@ -10,11 +10,15 @@ import sys
 
 root = SPECPATH
 icon = os.path.join(root, "packaging", "icon.ico")
+from PyInstaller.utils.hooks import collect_all
 
 hidden, datas, binaries = [], [(os.path.join(root, "web"), "web")], []
 if sys.platform == "win32":
     # pywebview's Windows window (Edge WebView2) is loaded at runtime.
     hidden += ["webview.platforms.winforms", "webview.platforms.edgechromium", "clr"]
+    # Windows text recognition (reading the spectator screen).
+    d, b, h = collect_all("winrt")
+    datas, binaries, hidden = datas + d, binaries + b, hidden + h
 
 a = Analysis(
     [os.path.join(root, "ValorantHUD.py")],

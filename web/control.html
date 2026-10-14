@@ -168,6 +168,8 @@
 
   <section class="wide">
     <h2>Live data</h2>
+    <label class="toggle"><input type="checkbox" id="reader"> Read VALORANT on this PC (spectator screen)</label>
+    <div class="note" id="reader-status" style="margin:-4px 0 10px"></div>
     <div class="feed" id="feed"></div>
     <details class="note" style="margin-top:8px">
       <summary>Sending live data to the HUD</summary>
@@ -301,6 +303,7 @@ for (const side of ["left", "right"])
     if (!calling && state.config.timeouts[side] > 0) change.timeouts = { [side]: state.config.timeouts[side] - 1 };
     post("/api/config", change);
   };
+$("reader").onchange = e => post("/api/reader", { enabled: e.target.checked });
 $("tech-pause").onclick = () => post("/api/config", { tech_pause: !state.config.tech_pause, timeout_call: "" });
 $("show-scoreboard").onclick = () => post("/api/config", { show: { scoreboard: !state.config.show.scoreboard } });
 $("show-timeouts").onchange = e => post("/api/config", { show: { timeouts: e.target.checked } });
@@ -347,10 +350,16 @@ function apply(s) {
   $("tech-pause").classList.toggle("on", cfg.tech_pause);
   $("show-scoreboard").classList.toggle("on", cfg.show.scoreboard);
   $("show-timeouts").checked = cfg.show.timeouts !== false;
+  const rd = app.reader;
+  $("reader").checked = rd.enabled;
+  $("reader").disabled = !rd.available;
+  $("reader-status").textContent = !rd.available ? rd.status
+    : rd.enabled ? `${rd.status}${rd.age != null ? ` (last read ${rd.age}s ago)` : ""}. Keep the top bar visible; open the Tab scoreboard (e.g. in the buy phase) to read names, credits, weapons, ults and K/D/A.`
+    : "Off. Turn on when VALORANT (spectating) runs on this PC; an observer PC can read it and send it here instead.";
   const f = app.feed;
   $("feed").innerHTML = f.updates
     ? `${f.updates} updates received; last ${f.age}s ago. Sources: ` + Object.entries(f.sources).map(([k, v]) => `<code>${k}</code> (${v}s ago)`).join(", ")
-    : "No live data received yet. The screen reader isn't built yet: for now use <b>Demo match</b>, or send data to <code>/api/ingest</code>.";
+    : "No live data received yet. Turn on the screen reader (here or on an observer PC), or use <b>Demo match</b> to try the HUD.";
 
   showUpdate(app.update);
   if (first) {

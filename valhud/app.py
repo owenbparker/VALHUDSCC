@@ -19,6 +19,7 @@ from . import game, outputs
 from .config import DATA_DIR, LOGO_DIR, WEB_DIR, web_file
 from .demo import DemoGame
 from .log import log, since
+from .reader import ScreenReader
 from .source import LiveFeed
 from .updater import Updater, clean_up_old_update
 
@@ -45,6 +46,7 @@ class HudApp:
         self.updated_at = 0.0
         self.server = None
         self.updater = Updater()
+        self.reader = ScreenReader(self._reader_update)
         self.overlay_window = None  # the desktop app's HUD-over-the-game window
         # "gfx" runs the HUD; "observer" only shows another PC's HUD over the
         # game here. None until one is picked.
@@ -72,6 +74,30 @@ class HudApp:
         self.mode = mode
         self._was_connected = None
         self.refresh()
+
+    def _reader_update(self, update):
+        """The screen reader's reading: used here, or sent to the GFX PC when
+        this is an observer client."""
+        cfg = self.config.get()
+        if self.role == "observer":
+            if not cfg.get("observer_url"):
+                return
+            from .overlay_window import gfx_base_url
+            req = urllib.request.Request(gfx_base_url(cfg["observer_url"]) + "/api/ingest",
+                                         json.dumps(update).encode("utf-8"), {"Content-Type": "application/json"})
+            opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+            with opener.open(req, timeout=3) as r:
+                r.read()
+        else:
+            self.ingest(update)
+
+    def set_reader(self, enabled):
+        self.config.update({"screen_reader": bool(enabled)})
+        if enabled and not self.reader.available:
+            raise ValueError(self.reader.reason)
+        self.reader.set_enabled(enabled)
+        if not enabled:
+            log("Stopped reading the screen")
 
     def ingest(self, update):
         """Live data from a feed (screen reader, Overwolf app, another tool)."""
@@ -131,6 +157,7 @@ class HudApp:
 
     def stop(self):
         self._stop.set()
+        self.reader.stop()
         if self.server:
             self.server.stop()
 
@@ -140,7 +167,7 @@ class HudApp:
         network = bool(cfg.get("allow_network"))
         lan = lan_ip() if network else None
         return {"mode": self.mode, "role": self.role, "demo_speed": self.demo_speed, "network": network, "port": port,
-                "feed": self.feed.info(), "update": self.updater.info(),
+                "feed": self.feed.info(), "reader": self.reader.info(), "update": self.updater.info(),
                 "overlay_window": self.overlay_window.info() if self.overlay_window else {"available": False},
                 "lan_url": f"http://{lan}:{port}" if lan else None, "data_dir": DATA_DIR}
 
@@ -326,10 +353,12 @@ def make_handler(app):
         def do_POST(self):
             # Other PCs may read the HUD (when allowed), but only this PC can
             # change it.
-            if not _is_local(self.client_address[0]):
-                return self._send('{"error":"Changes can only be made on the HUD PC"}', status=403)
             url = urlparse(self.path)
             path = url.path
+            # An observer PC's screen reader sends its readings here.
+            lan_feed = path == "/api/ingest" and app.config.get().get("allow_network")
+            if not _is_local(self.client_address[0]) and not lan_feed:
+                return self._send('{"error":"Changes can only be made on the HUD PC"}', status=403)
             length = int(self.headers.get("Content-Length") or 0)
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
@@ -357,6 +386,8 @@ def make_handler(app):
                     if body.get("url") is not None:
                         app.config.update({"observer_url": body["url"]})
                     app.overlay_window.set(bool(body.get("open")), body.get("screen"), body.get("url"))
+                elif path == "/api/reader":
+                    app.set_reader(body.get("enabled"))
                 elif path == "/api/role":
                     app.set_role(body.get("role"))
                 else:
@@ -400,6 +431,8 @@ def start(app):
     """Start the web server and the game poller. Raises OSError if the port is taken."""
     port = app.config.get()["http_port"]
     app.server = Server(app, app.host(), port)
+    if app.config.get().get("screen_reader"):
+        app.reader.set_enabled(True)
     clean_up_old_update()
     app.updater.check_in_background()
     threading.Thread(target=app.run_poller, daemon=True).start()
