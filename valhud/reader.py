@@ -477,6 +477,16 @@ def _field(text, label):
     return number(m.group(1)) if m else None
 
 
+def _money(text):
+    """Credits from "... creds 3,550 end": the whole amount, thousands
+    separator and all (it used to stop at the comma: 3,550 -> 3)."""
+    m = re.search(r"creds\W*(.*?)\s*end", text, re.I)
+    value = number(m.group(1)) if m else None
+    if value is not None and value > 9000 and value % 10 ** (len(str(value)) - 1) <= 9000:
+        value %= 10 ** (len(str(value)) - 1)   # the credits sign read as a digit
+    return value if value is not None and value <= 9000 else None
+
+
 def read_score_line(frame, ocr):
     """{"left": int, "right": int, "timer": seconds} from the top bar."""
     out = {}
@@ -537,7 +547,7 @@ def read_scoreboard(frame, ocr):
         info = rows[key]
         info["_text"] = text
         info["k"], info["d"], info["a"] = _field(text, "kills"), _field(text, "deaths"), _field(text, "assists")
-        info["creds"] = _field(text, "creds")
+        info["creds"] = _money(text)
         info["ult"] = None
     # Ult points ("0 / 7"): OCR sometimes drops the first digit, so they're
     # read three ways and the first reading that makes sense is kept.
@@ -564,6 +574,49 @@ def read_scoreboard(frame, ocr):
 
 
 # --- putting it together ----------------------------------------------------
+
+def seat_rows(frame, side, top_agents, known_agents=None):
+    """({row: seat}, {row: agent}) for one team's scoreboard rows.
+
+    The rows are sorted by score, not in top-bar order: each row goes to the
+    seat with the same agent. A row is only placed when that's certain (or
+    it's the last row left for the last seat), so a name or loadout never
+    lands on the wrong player."""
+    row_agents = {}
+    team = [a for (t, _), a in (known_agents or {}).items() if t == side]
+    for r in range(5):
+        best = identify_agent(row_cell(frame, side, r, "portrait"), (32, 34, 36), kind="row",
+                              agents=team if len(set(team)) == 5 else None)
+        row_agents[r] = best[0][1] if clear_match(best) else None
+    free = [s_ for s_ in range(1, 6)]
+    assign = {}
+    seats_of = {}
+    for s_ in range(1, 6):
+        seats_of.setdefault(top_agents.get((side, s_)), []).append(s_)
+    for r, agent in row_agents.items():
+        seats = [s_ for s_ in seats_of.get(agent, []) if s_ in free] if agent else []
+        if len(seats) == 1 and list(row_agents.values()).count(agent) == 1:
+            assign[r] = seats[0]
+            free.remove(seats[0])
+    left_rows = [r for r in range(5) if r not in assign]
+    if len(left_rows) == 1 and len(free) == 1:
+        assign[left_rows[0]] = free[0]
+    return assign, row_agents
+
+
+def read_name(frame, side, row, ocr):
+    """One row's name, read carefully: at three contrasts, keeping the
+    reading that comes up most (the longest on a tie)."""
+    x0, x1 = COLS["name"]
+    y0 = ROW_TOP[side] + ROW_H * row
+    crop = frame.crop(x0, y0 + 2, x1, y0 + ROW_H - 2)
+    seen = {}
+    for level in (150, 120, 185):
+        text = player_name(" ".join(t for t, _, _ in sorted(ocr.words(ink(crop, 3, level)), key=lambda w: w[1])))
+        if len(text) >= 2:
+            seen[text] = seen.get(text, 0) + 1
+    return max(seen, key=lambda t: (seen[t], len(t))) if seen else ""
+
 
 def read_frame(image, ocr=None, known_agents=None):
     """Everything readable in one frame, as an update for game.merge()."""
@@ -615,30 +668,7 @@ def read_frame(image, ocr=None, known_agents=None):
         board = read_scoreboard(frame, ocr) if ocr else {}
         by_slot = {(p["team"], p["slot"]): p for p in players}
         for side in ("left", "right"):
-            # Scoreboard rows aren't in top-bar order: match them by agent.
-            row_agents = {}
-            team = [a for (t, _), a in (known_agents or {}).items() if t == side]
-            for r in range(5):
-                best = identify_agent(row_cell(frame, side, r, "portrait"), (32, 34, 36), kind="row",
-                                      agents=team if len(set(team)) == 5 else None)
-                row_agents[r] = best[0][1] if clear_match(best) else None
-            # The rows are sorted by score, not in top-bar order: each row
-            # goes to the seat with the same agent. A row is only used when
-            # that's certain (or it's the last row left for the last seat),
-            # so a name or loadout never lands on the wrong player.
-            free = [s for s in range(1, 6)]
-            assign = {}
-            seats_of = {}
-            for s_ in range(1, 6):
-                seats_of.setdefault(top_agents.get((side, s_)), []).append(s_)
-            for r, agent in row_agents.items():
-                seats = [s_ for s_ in seats_of.get(agent, []) if s_ in free] if agent else []
-                if len(seats) == 1 and list(row_agents.values()).count(agent) == 1:
-                    assign[r] = seats[0]
-                    free.remove(seats[0])
-            left_rows = [r for r in range(5) if r not in assign]
-            if len(left_rows) == 1 and len(free) == 1:
-                assign[left_rows[0]] = free[0]
+            assign, row_agents = seat_rows(frame, side, top_agents, known_agents)
             for r, slot in assign.items():
                 p = by_slot[(side, slot)]
                 if row_agents[r]:
@@ -770,6 +800,33 @@ class ScreenReader:
         with open(base + ".json", "w", encoding="utf-8") as f:
             json.dump(update, f, indent=1)
         return base + ".png"
+
+    def scan_names(self):
+        """Read every name off the Tab scoreboard carefully and say whose
+        seat each belongs to: {"left": {1: "name", ...}, "right": {...}}.
+        The scoreboard must be open."""
+        if not self.ocr:
+            raise ValueError(self.reason or "Windows text recognition isn't available")
+        image, reason = capture_valorant()
+        if image is None:
+            raise ValueError(reason)
+        frame = Frame(image)
+        if not scoreboard_open(frame):
+            raise ValueError("Open the Tab scoreboard in VALORANT (it's up in the buy phase), then scan")
+        update = read_frame(image, None, self.agents)
+        self._learn_agents(update)
+        top_agents = {(p["team"], p["slot"]): self.agents.get((p["team"], p["slot"])) or p.get("agent")
+                      for p in update["players"]}
+        names, missed = {"left": {}, "right": {}}, []
+        for side in ("left", "right"):
+            assign, _ = seat_rows(frame, side, top_agents, self.agents)
+            for r in range(5):
+                name = read_name(frame, side, r, self.ocr)
+                if r in assign and name:
+                    names[side][assign[r]] = name
+                elif name:
+                    missed.append(name)
+        return names, missed
 
     def _steady_score(self, update):
         """A new score only counts once it's been read the same twice in a

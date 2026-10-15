@@ -163,6 +163,10 @@
   <section class="wide">
     <h2>Players</h2>
     <p class="note" style="margin:0 0 8px">Names typed here replace the ones from the game. Leave blank to use the game's.</p>
+    <div class="row" style="margin:0 0 10px">
+      <button id="scan-names" style="flex:0 0 auto" title="Reads every name off VALORANT's Tab scoreboard carefully and fills them in below, each by its player's agent">Scan names</button>
+      <span class="note" id="scan-result" style="margin:0">With the Tab scoreboard open in VALORANT (it's up in the buy phase): fills in every player's name from the game.</span>
+    </div>
     <div class="players"><div id="players-left"></div><div id="players-right"></div></div>
   </section>
 
@@ -309,6 +313,14 @@ for (const side of ["left", "right"])
   };
 $("reader").onchange = e => post("/api/reader", { enabled: e.target.checked });
 $("reader-save").onclick = () => post("/api/reader/save", {});
+$("scan-names").onclick = async () => {
+  $("scan-names").disabled = true;
+  $("scan-result").textContent = "Scanning…";
+  try { await post("/api/reader/names", {}); } finally { $("scan-names").disabled = false; }
+  const scan = state && state.app.scan;
+  if (scan) $("scan-result").textContent = `Filled in ${scan.found} of 10.`
+    + (scan.missed.length ? ` Couldn't tell whose: ${scan.missed.join(", ")} (agent not recognised yet): type those in.` : "");
+};
 $("tech-pause").onclick = () => post("/api/config", { tech_pause: !state.config.tech_pause, timeout_call: "" });
 $("show-scoreboard").onclick = () => post("/api/config", { show: { scoreboard: !state.config.show.scoreboard } });
 $("show-timeouts").onchange = e => post("/api/config", { show: { timeouts: e.target.checked } });

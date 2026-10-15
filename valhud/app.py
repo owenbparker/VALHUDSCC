@@ -168,6 +168,7 @@ class HudApp:
         lan = lan_ip() if network else None
         return {"mode": self.mode, "role": self.role, "demo_speed": self.demo_speed, "network": network, "port": port,
                 "feed": self.feed.info(), "reader": self.reader.info(), "update": self.updater.info(),
+                "scan": getattr(self, "last_scan", None),
                 "overlay_window": self.overlay_window.info() if self.overlay_window else {"available": False},
                 "lan_url": f"http://{lan}:{port}" if lan else None, "data_dir": DATA_DIR}
 
@@ -387,6 +388,15 @@ def make_handler(app):
                     if body.get("url") is not None:
                         app.config.update({"observer_url": body["url"]})
                     app.overlay_window.set(bool(body.get("open")), body.get("screen"), body.get("url"))
+                elif path == "/api/reader/names":
+                    names, missed = app.reader.scan_names()
+                    current = app.config.get()["player_names"]
+                    new = {side: [names[side].get(i + 1) or current[side][i] for i in range(5)] for side in ("left", "right")}
+                    app.config.update({"player_names": new})
+                    found = sum(len(v) for v in names.values())
+                    log(f"Scanned names: {found} of 10 placed"
+                        + (f"; couldn't tell whose: {', '.join(missed)}" if missed else ""))
+                    app.last_scan = {"found": found, "missed": missed}
                 elif path == "/api/reader/save":
                     saved = app.reader.save_frame(os.path.join(DATA_DIR, "frames"))
                     log(f"Saved the screen and what was read from it: {saved}")
