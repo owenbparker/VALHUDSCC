@@ -828,6 +828,24 @@ def make_dpi_aware():
             ctypes.windll.user32.SetProcessDPIAware()
 
 
+class BuyBanner:
+    """The buy phase, from the BUY PHASE banner (whatever it says under
+    ROUND n): on as soon as it's seen, off once it's been gone for two reads
+    running (the round has started: the timer shows 1:40)."""
+
+    def __init__(self):
+        self.on, self.missed = False, 0
+
+    def seen(self, banner):
+        if banner:
+            self.on, self.missed = True, 0
+        elif self.on:
+            self.missed += 1
+            if self.missed >= 2:
+                self.on = False
+        return "buy" if self.on else "combat"
+
+
 class ScreenReader:
     """Reads the game in the background and hands each update to `send`."""
 
@@ -839,6 +857,7 @@ class ScreenReader:
         self.read_at = 0.0
         self.agents = {}       # (side, slot) -> agent, kept for the match
         self._agent_votes = {}
+        self.banner = BuyBanner()
         self._stop = threading.Event()
         self._thread = None
         self.ocr = None
@@ -918,7 +937,7 @@ class ScreenReader:
         return names, missed
 
     ALIVE_EVERY = 0.1   # seconds between top-bar checks (deaths show within about this)
-    ALIVE_TOP = 92      # rows of the screen the health bars need (1080p)
+    ALIVE_TOP = 170     # rows of the screen the health bars and BUY PHASE banner need (1080p)
 
     def _run_alive(self):
         """Deaths and health, fast: only the top bar's health bars, about ten
@@ -935,32 +954,17 @@ class ScreenReader:
                         for slot in range(1, 6):
                             alive, health = health_bar(frame, side, slot)
                             players.append({"team": side, "slot": slot, "alive": alive, "health": health})
-                    key = [(p["alive"], p["health"]) for p in players]
+                    update = {"source": "screen", "players": players}
+                    if attacking_side(frame):   # the top bar's on screen: the phase can be told
+                        update["match"] = {"phase": self.banner.seen(buy_phase(frame))}
+                    key = [(p["alive"], p["health"]) for p in players] + [update.get("match")]
                     if key != last or time.time() - sent_at > 1:
-                        self.send({"source": "screen", "players": players})
+                        self.send(update)
                         last, sent_at = key, time.time()
                     self.fast_at = time.time()
             except Exception:
                 pass  # the full read reports problems
             self._stop.wait(self.ALIVE_EVERY)
-
-    def _buy_phase(self, update):
-        """The buy phase runs from the BUY PHASE banner (whatever it says
-        under ROUND n) until the round timer shows 1:40, even if the banner
-        goes first: the scoreboard stays up till then."""
-        m = update["match"]
-        if "phase" not in m:
-            return
-        now = time.time()
-        if m["phase"] == "buy":
-            self._buy_since = now
-            return
-        if getattr(self, "_buy_since", None):
-            timer = m.get("timer")
-            if (timer is not None and timer >= 99) or now - self._buy_since > 45:
-                self._buy_since = None
-            else:
-                m["phase"] = "buy"
 
     def _steady_score(self, update):
         """A new score only counts once it's been read the same twice in a
@@ -1006,9 +1010,9 @@ class ScreenReader:
                     update = read_frame(image, self.ocr, self.agents)
                     self._learn_agents(update)
                     self._steady_score(update)
-                    self._buy_phase(update)
                     if time.time() - getattr(self, "fast_at", 0) < 2:
-                        # The fast loop has newer alive/health than this frame.
+                        # The fast loop has newer alive/health and phase than this frame.
+                        update["match"].pop("phase", None)
                         for p in update["players"]:
                             p.pop("alive", None)
                             p.pop("health", None)

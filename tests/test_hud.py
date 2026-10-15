@@ -171,16 +171,19 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual([r["win_type"] for r in rounds[:5]],
                          ["Elimination", "Elimination", "Deactivation", "Deactivation", "Elimination"])
 
-    def test_buy_phase_holds_until_the_round_timer_starts(self):
-        from valhud.reader import ScreenReader
-        r = ScreenReader.__new__(ScreenReader)
-        phases = []
-        for phase, timer in (("combat", 20), ("buy", 28), ("combat", 12), ("combat", None), ("combat", 100), ("combat", 99)):
-            update = {"match": {"phase": phase, "timer": timer}}
-            r._buy_phase(update)
-            phases.append(update["match"]["phase"])
-        # Banner gone at 0:12 (or timer unread): still the buy phase until 1:40.
-        self.assertEqual(phases, ["combat", "buy", "buy", "buy", "combat", "combat"])
+    def test_buy_phase_follows_the_banner(self):
+        from valhud.reader import BuyBanner
+        b = BuyBanner()
+        got = [b.seen(x) for x in (False, True, True, False, True, False, False, False)]
+        # On at once; one missed read (a flicker) doesn't end it; two do.
+        self.assertEqual(got, ["combat", "buy", "buy", "buy", "buy", "buy", "combat", "combat"])
+
+    def test_history_never_longer_than_rounds_played(self):
+        s = game.merge(game.empty_state(), {"match": {"score": {"left": 7, "right": 5},
+                                                      "rounds": [{"winner": "left", "win_type": "Elimination"}] * 12}})
+        self.assertEqual(len(s["match"]["rounds"]), 12)
+        s = game.merge(s, {"match": {"score": {"left": 0, "right": 2}}})   # next game
+        self.assertEqual(len(s["match"]["rounds"]), 2)
 
     def test_player_names_lose_team_tags(self):
         from valhud.reader import player_name

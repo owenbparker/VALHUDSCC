@@ -88,6 +88,11 @@ def merge(state, update):
     for key in ("score", "spike"):
         if isinstance(m.get(key), dict):
             out["match"][key].update(m[key])
+    # Never more rounds of history than have been played (a new game starts
+    # at 0-0; history read before it is dropped).
+    played = sum(int(v or 0) for v in out["match"]["score"].values())
+    if len(out["match"].get("rounds") or []) > played:
+        out["match"]["rounds"] = out["match"]["rounds"][:played]
     for p in update.get("players") or []:
         team, slot = p.get("team"), p.get("slot")
         if team not in SIDES or not isinstance(slot, int) or not 1 <= slot <= 5:
