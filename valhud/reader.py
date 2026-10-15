@@ -462,8 +462,8 @@ def read_scoreboard(frame, ocr):
     for side in ("left", "right"):
         top = ROW_TOP[side]
         x0, x1 = COLS["name"]
-        # White text only: the grey team tag before the name ("FAPP | ") drops out.
-        words = ocr.words(ink(frame.crop(x0, top, x1, top + 5 * ROW_H), 2, 200))
+        # (The grey team tag before a name, "FAPP | ", is taken off after.)
+        words = ocr.words(ink(frame.crop(x0, top, x1, top + 5 * ROW_H), 2, 150))
         for r in range(5):
             mine = sorted((cx, t) for t, cx, cy in words if r * ROW_H <= cy / 2 < (r + 1) * ROW_H)
             rows[(side, r)] = {"name": player_name(" ".join(t for _, t in mine))}
