@@ -170,8 +170,10 @@ class OverlayWindow:
         elif not open_it and self.window:
             self.close()
 
+    extra = ""  # more URL options (the self-test leaves the scoreboard out)
+
     def _target(self):
-        return f"{self.url or f'http://127.0.0.1:{self.port}'}/overlay?fit=1"
+        return f"{self.url or f'http://127.0.0.1:{self.port}'}/overlay?fit=1{self.extra}"
 
     def _screen_rect(self):
         screens = monitors() or [(0, 0, 1920, 1080)]
@@ -281,6 +283,9 @@ def self_test(port, out_dir):
     for name in ("without-fix", "transparent"):
         ov = OverlayWindow(Config(), port, title=f"overlay-test-{name}")
         ov.fix_backdrop = name != "without-fix"
+        # The demo's buy phase would put the scoreboard over the points that
+        # must be see-through.
+        ov.extra = "&scoreboard=0"
         ov.open()
         time.sleep(8)
         shot = ImageGrab.grab(all_screens=False)

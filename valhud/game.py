@@ -26,12 +26,12 @@ SIDES = ("left", "right")
 
 # Agent folder names in web/hud/Resources/Agentes (KAY/O is "Kayo").
 AGENTS = ["Astra", "Breach", "Brimstone", "Chamber", "Clove", "Cypher", "Deadlock", "Fade", "Gekko", "Harbor",
-          "Iso", "Jett", "Kayo", "Killjoy", "Neon", "Omen", "Phoenix", "Raze", "Reyna", "Sage", "Skye", "Sova",
+          "Iso", "Jett", "Kayo", "Killjoy", "Miks", "Neon", "Omen", "Phoenix", "Raze", "Reyna", "Sage", "Skye", "Sova",
           "Tejo", "Viper", "Vyse", "Waylay", "Yoru"]
 
 # Ultimate points needed (only a fallback: live data gives the real value).
 ULT_MAX = {"Astra": 7, "Breach": 8, "Brimstone": 8, "Chamber": 8, "Clove": 8, "Cypher": 6, "Deadlock": 7,
-           "Fade": 8, "Gekko": 8, "Harbor": 7, "Iso": 7, "Jett": 8, "Kayo": 8, "Killjoy": 9, "Neon": 8,
+           "Fade": 8, "Gekko": 8, "Harbor": 7, "Iso": 7, "Jett": 8, "Kayo": 8, "Killjoy": 9, "Miks": 8, "Neon": 8,
            "Omen": 7, "Phoenix": 6, "Raze": 8, "Reyna": 7, "Sage": 8, "Skye": 8, "Sova": 8, "Tejo": 8,
            "Viper": 9, "Vyse": 8, "Waylay": 8, "Yoru": 8}
 
