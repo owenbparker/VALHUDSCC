@@ -171,6 +171,17 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual([r["win_type"] for r in rounds[:5]],
                          ["Elimination", "Elimination", "Deactivation", "Deactivation", "Elimination"])
 
+    def test_buy_phase_holds_until_the_round_timer_starts(self):
+        from valhud.reader import ScreenReader
+        r = ScreenReader.__new__(ScreenReader)
+        phases = []
+        for phase, timer in (("combat", 20), ("buy", 28), ("combat", 12), ("combat", None), ("combat", 100), ("combat", 99)):
+            update = {"match": {"phase": phase, "timer": timer}}
+            r._buy_phase(update)
+            phases.append(update["match"]["phase"])
+        # Banner gone at 0:12 (or timer unread): still the buy phase until 1:40.
+        self.assertEqual(phases, ["combat", "buy", "buy", "buy", "combat", "combat"])
+
     def test_player_names_lose_team_tags(self):
         from valhud.reader import player_name
         self.assertEqual(player_name("FIT | Panda Nate"), "Panda Nate")

@@ -52,15 +52,37 @@
     board.total = total;
     return now >= board.from && now < board.until;
   }
+  // In: the HUD's player panels slide away, then the scoreboard slides up
+  // from the bottom. Out: the scoreboard slides down, then the panels come
+  // back. (The HUD page and the scoreboard page each do their half, from
+  // the same state.)
+  var PANELS_MS = 650, SLIDE_MS = 550, boardOn = null, boardTimer = null;
   function showBoard(on) {
+    on = !!on;
+    if (on === boardOn) return;
+    var first = boardOn === null;
+    boardOn = on;
+    clearTimeout(boardTimer);
     if (SCOREBOARD) {
-      var root = document.documentElement.style;
-      root.transition = "opacity 0.5s ease";
-      root.opacity = on ? "1" : "0";
+      var root = document.documentElement.style, board = document.querySelector(".ScoreBoard");
+      root.transition = "none";
+      if (board) board.style.transition = "transform " + SLIDE_MS + "ms cubic-bezier(.2,.8,.2,1)";
+      if (on) {
+        if (board) board.style.transform = "translateY(480px)";
+        root.opacity = "1";
+        boardTimer = setTimeout(function () { if (board) board.style.transform = "translateY(0)"; }, first ? 0 : PANELS_MS);
+      } else {
+        if (board) board.style.transform = "translateY(480px)";
+        boardTimer = setTimeout(function () { root.opacity = "0"; }, first ? 0 : SLIDE_MS);
+      }
     } else {
-      var left = document.getElementById("teamIzquierda");
-      var hidden = left && left.style.left === "-385px";
-      if (left && !!on !== !!hidden && typeof templateToggle === "function") templateToggle();
+      var toggle = function () {
+        var left = document.getElementById("teamIzquierda");
+        var hidden = left && left.style.left === "-385px";
+        if (left && boardOn !== !!hidden && typeof templateToggle === "function") templateToggle();
+      };
+      if (on || first) toggle();
+      else boardTimer = setTimeout(toggle, SLIDE_MS);   // after the scoreboard has slid away
     }
   }
 

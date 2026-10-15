@@ -911,6 +911,24 @@ class ScreenReader:
                     missed.append(name)
         return names, missed
 
+    def _buy_phase(self, update):
+        """The buy phase runs from the BUY PHASE banner (whatever it says
+        under ROUND n) until the round timer shows 1:40, even if the banner
+        goes first: the scoreboard stays up till then."""
+        m = update["match"]
+        if "phase" not in m:
+            return
+        now = time.time()
+        if m["phase"] == "buy":
+            self._buy_since = now
+            return
+        if getattr(self, "_buy_since", None):
+            timer = m.get("timer")
+            if (timer is not None and timer >= 99) or now - self._buy_since > 45:
+                self._buy_since = None
+            else:
+                m["phase"] = "buy"
+
     def _steady_score(self, update):
         """A new score only counts once it's been read the same twice in a
         row: one misread (10 -> 1 -> 10) would otherwise play round-win
@@ -955,6 +973,7 @@ class ScreenReader:
                     update = read_frame(image, self.ocr, self.agents)
                     self._learn_agents(update)
                     self._steady_score(update)
+                    self._buy_phase(update)
                     for p in update["players"]:
                         if (p["team"], p["slot"]) in self.agents:
                             p["agent"] = self.agents[(p["team"], p["slot"])]
