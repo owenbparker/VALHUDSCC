@@ -64,16 +64,26 @@
     boardOn = on;
     clearTimeout(boardTimer);
     if (SCOREBOARD) {
-      var root = document.documentElement.style, board = document.querySelector(".ScoreBoard");
-      root.transition = "none";
-      if (board) board.style.transition = "transform " + SLIDE_MS + "ms cubic-bezier(.2,.8,.2,1)";
+      // The slide moves the whole page (its top bar is the page background,
+      // which stays put). At rest nothing is moved at all: moving the
+      // scoreboard's own container shifts every piece positioned inside it.
+      var root = document.documentElement.style, OFF = "translateY(480px)";
+      var slide = "transform " + SLIDE_MS + "ms cubic-bezier(.2,.8,.2,1)";
       if (on) {
-        if (board) board.style.transform = "translateY(480px)";
+        root.transition = "none";
+        root.transform = first ? "" : OFF;
         root.opacity = "1";
-        boardTimer = setTimeout(function () { if (board) board.style.transform = "translateY(0)"; }, first ? 0 : PANELS_MS);
+        if (!first) boardTimer = setTimeout(function () {
+          root.transition = slide;
+          root.transform = "translateY(0)";
+          boardTimer = setTimeout(function () { root.transition = "none"; root.transform = ""; }, SLIDE_MS + 50);
+        }, PANELS_MS);
+      } else if (first) {
+        root.opacity = "0";
       } else {
-        if (board) board.style.transform = "translateY(480px)";
-        boardTimer = setTimeout(function () { root.opacity = "0"; }, first ? 0 : SLIDE_MS);
+        root.transition = slide;
+        root.transform = OFF;
+        boardTimer = setTimeout(function () { root.opacity = "0"; root.transition = "none"; root.transform = ""; }, SLIDE_MS);
       }
     } else {
       var toggle = function () {
