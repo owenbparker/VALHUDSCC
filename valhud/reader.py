@@ -41,7 +41,7 @@ SPIKE_ICON = (930, 24, 990, 70)    # replaces the timer once planted
 # Tab scoreboard: row tops (34px rows), left team's block then right's.
 ROW_TOP = {"left": 338, "right": 569}
 ROW_H = 34
-COLS = {"portrait": (573, 607), "name": (643, 812), "ult": (812, 933),
+COLS = {"portrait": (573, 607), "name": (634, 812), "ult": (812, 933),
         "ult_have": (812, 867), "ult_need": (879, 933),  # either side of the "/"
         "k": (934, 973), "d": (974, 1013),
         "a": (1014, 1053), "weapon": (1060, 1168), "shield": (1170, 1204), "creds": (1204, 1294)}
@@ -262,6 +262,85 @@ def attacking_side(frame):
     if lt > 0.15 and rr > 0.15 and lt > lr and rr > rt:
         return "right"
     return None
+
+
+# Round history on the Tab scoreboard: a row for the defending team and one
+# for the attacking team, each round's win marked by an icon in the
+# winner's row (skull = elimination, pliers = defuse, ...).
+HISTORY_X = (648, 1330)
+HISTORY_ROWS = {"def": (512, 540), "atk": (540, 568)}
+WIN_TYPES = ("Elimination", "Deactivation", "Detonation", "Time")
+_win_icons = []
+
+
+def _win_templates():
+    """[(win_type, silhouette)]: real in-game icons (web/reader_refs/round-*)
+    and the scoreboard template's own icons."""
+    np = _np()
+    from PIL import Image
+    if not _win_icons:
+        for kind in WIN_TYPES:
+            for path in (os.path.join(REFS_DIR, f"round-{kind}.png"),
+                         os.path.join(WEB_DIR, "scoreboard", "Resources", "Logos", f"{kind}.png")):
+                if os.path.isfile(path):
+                    img = Image.open(path).convert("RGBA")
+                    mask = np.asarray(img)[..., 3] > 100 if img.getextrema()[3][0] < 200 else \
+                        np.asarray(img.convert("L")) > 127
+                    sil = _silhouette(mask, (20, 20))
+                    if sil:
+                        _win_icons.append((kind, sil))
+    return _win_icons
+
+
+def _icon_mask(img):
+    """The coloured (teal or red) icon pixels of a history cell."""
+    np = _np()
+    a = np.asarray(img.convert("RGB")).astype(int)
+    return (a.max(axis=2) - a.min(axis=2) > 50) & (a.max(axis=2) > 110)
+
+
+def win_type(mask):
+    np = _np()
+    seen = _silhouette(mask, (20, 20))
+    if seen is None:
+        return "Elimination"
+    shape, ratio = seen
+    best = ("Elimination", -1.0)
+    for kind, (t, r) in _win_templates():
+        score = float(np.minimum(shape, t).sum() / np.maximum(shape, t).sum()) - 0.15 * abs(float(np.log(ratio / r)))
+        if score > best[1]:
+            best = (kind, score)
+    return best[0]
+
+
+def round_history(frame, attackers):
+    """[{"winner": "left"/"right", "win_type": ...}] for every round played,
+    from the Tab scoreboard (None if the attacking side isn't known). Icons
+    are taken left to right across both rows, one per round, so the
+    half-time divider and spacing don't matter."""
+    np = _np()
+    if attackers not in ("left", "right"):
+        return None
+    team = {"def": "right" if attackers == "left" else "left", "atk": attackers}
+    icons = []
+    for row, (y0, y1) in HISTORY_ROWS.items():
+        strip = frame.crop(HISTORY_X[0], y0, HISTORY_X[1], y1)
+        mask = _icon_mask(strip)
+        cols = mask.any(axis=0)
+        x, w = 0, len(cols)
+        while x < w:
+            if cols[x]:
+                start = x
+                while x < w and cols[x]:
+                    x += 1
+                piece = mask[:, start:x]
+                rows_lit = np.nonzero(piece.any(axis=1))[0]
+                # Icons are ~14px square; the spike-plant dots and the
+                # half-time line are much smaller or thinner.
+                if 9 <= x - start <= 22 and len(rows_lit) and rows_lit[-1] - rows_lit[0] >= 9:
+                    icons.append((start, team[row], win_type(piece)))
+            x += 1
+    return [{"winner": winner, "win_type": kind} for _, winner, kind in sorted(icons)]
 
 
 BUY_BANNER = (812, 140, 1110, 162)   # the grey box behind "ROUND n //////" above BUY PHASE
@@ -689,6 +768,9 @@ def read_frame(image, ocr=None, known_agents=None):
                     if info.get(key) is not None:
                         p[field] = info[key]
         update["match"]["scoreboard_open"] = True
+        history = round_history(frame, update["match"].get("attackers"))
+        if history:
+            update["match"]["rounds"] = history
     return update
 
 

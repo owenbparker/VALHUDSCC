@@ -154,6 +154,23 @@ class ReaderTests(unittest.TestCase):
         update = read_frame(frame, known_agents={("left", 1): "Omen"})
         self.assertIn(("left", 1, "Phoenix"), update["seen_agents"])
 
+    def test_round_history(self):
+        # Part of a real Tab scoreboard after 11 rounds (DEF 7, ATK 4), placed
+        # where it sits on a 1920x1080 screen.
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        from PIL import Image
+        from valhud.reader import Frame, round_history
+        frame = Image.new("RGB", (1920, 1080))
+        frame.paste(Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "round_history.png")).convert("RGB"),
+                    (514, 442))
+        rounds = round_history(Frame(frame), "right")   # left team defending
+        self.assertEqual("".join(r["winner"][0] for r in rounds), "rrlllllrlrl")
+        self.assertEqual([r["win_type"] for r in rounds[:5]],
+                         ["Elimination", "Elimination", "Deactivation", "Deactivation", "Elimination"])
+
     def test_player_names_lose_team_tags(self):
         from valhud.reader import player_name
         self.assertEqual(player_name("FIT | Panda Nate"), "Panda Nate")
