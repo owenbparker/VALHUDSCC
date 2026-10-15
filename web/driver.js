@@ -34,6 +34,36 @@
     return p.shield >= 50 ? "50" : p.shield > 0 ? "25" : "X";
   }
 
+  // Buy phase: the scoreboard shows and the HUD's player panels slide away.
+  // Decided from the game's phase (read off the BUY PHASE banner, or the
+  // demo's), not the templates' own timers: those flip on every score
+  // change, so a page opened mid-round or a misread score left them the
+  // wrong way round, and each copy of the page out of step with the others.
+  var templateToggle = window.DisplayTeams;
+  window.DisplayTeams = function () {};
+  var board = { total: null, from: 0, until: 0 };
+  function wantBoard(m, cfg) {
+    if ((cfg.show || {}).scoreboard) return true;
+    if (m.phase === "buy") return true;
+    if (m.phase === "combat" || m.phase === "end") return false;
+    // Phase unknown (a feed that doesn't say): the templates' timing after a won round.
+    var total = (m.score.left || 0) + (m.score.right || 0), now = Date.now();
+    if (board.total !== null && total > board.total) { board.from = now + 6600; board.until = now + 34500; }
+    board.total = total;
+    return now >= board.from && now < board.until;
+  }
+  function showBoard(on) {
+    if (SCOREBOARD) {
+      var root = document.documentElement.style;
+      root.transition = "opacity 0.5s ease";
+      root.opacity = on ? "1" : "0";
+    } else {
+      var left = document.getElementById("teamIzquierda");
+      var hidden = left && left.style.left === "-385px";
+      if (left && !!on !== !!hidden && typeof templateToggle === "function") templateToggle();
+    }
+  }
+
   var WIN_CODE = { Deactivation: "1", Elimination: "2", Time: "3", Detonation: "4" };
 
   function applyState(s) {
@@ -67,6 +97,12 @@
       call(k + "name", SetNamePlayer, [t, i, p.name]);
       call(k + "agent", SetPlayerAgent, [t, i, p.agent || ""]);
       if (p.weapon) call(k + "weapon", SetPlayerWeapon, [t, i, p.weapon, "contain"]);
+      else if (sent[k + "weapon"] !== "[]") {
+        // No gun (an empty loadout on the scoreboard): clear the old one.
+        sent[k + "weapon"] = "[]";
+        var gun = document.querySelector(t === 0 ? ".TIP" + i + " > div.Weapon1" : ".TDP" + i + " > div.Weapon2");
+        if (gun) gun.style.backgroundImage = "none";
+      }
       call(k + "shield", SetPlayerShield, [t, i, shieldCode(p)]);
       call(k + "hp", SetPlayerHP, [t, i, p.alive ? Math.max(1, p.health) : 0]);
       call(k + "kda", SetPlayerKDA, [t, i, p.kills, p.deaths, p.assists]);
@@ -88,9 +124,7 @@
         codes.right.push(r.winner === "right" ? WIN_CODE[r.win_type] || "2" : "0");
       });
       call("rounds", RoundTeams, [codes.left.join("|"), codes.right.join("|")]);
-      if ((cfg.show || {}).scoreboard) document.documentElement.style.opacity = "1";
-      else if (sent.forced) document.documentElement.style.opacity = "0";
-      sent.forced = !!(cfg.show || {}).scoreboard;
+      showBoard(wantBoard(m, cfg));
       return;
     }
 
@@ -112,6 +146,7 @@
     call("deftimeout", DefTimeOut, [cfg.timeout_call === "left"]);
     call("atttimeout", AttTimeOut, [cfg.timeout_call === "right"]);
     call("techpause", TechnicalPause, [!!cfg.tech_pause]);
+    showBoard(wantBoard(m, cfg));
   }
 
   function poll() {

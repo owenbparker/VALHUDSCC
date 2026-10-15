@@ -264,6 +264,16 @@ def attacking_side(frame):
     return None
 
 
+BUY_BANNER = (812, 140, 1110, 162)   # the grey box behind "ROUND n //////" above BUY PHASE
+
+
+def buy_phase(frame):
+    """Is the BUY PHASE banner up? Spectators see it for the whole buy phase."""
+    data = _pixels(frame.crop(*BUY_BANNER))
+    grey = sum(1 for p in data if 35 <= p[0] <= 110 and max(p) - min(p) < 14)
+    return grey / max(1, len(data)) > 0.7
+
+
 def scoreboard_open(frame):
     """Is the Tab scoreboard on screen? (teal rows above red rows)"""
     def share(y0, test):
@@ -586,8 +596,9 @@ def read_frame(image, ocr=None, known_agents=None):
             players.append(p)
     update = {"source": "screen", "match": {}, "players": players, "seen_agents": seen}
     side = attacking_side(frame)
-    if side:
+    if side:   # the top bar is on screen, so the phase can be told too
         update["match"]["attackers"] = side
+        update["match"]["phase"] = "buy" if buy_phase(frame) else "combat"
     planted = spike_planted(frame)
     update["match"]["spike"] = {"state": "planted"} if planted else {}
     carrier = next(((p["team"], p["slot"]) for p in players if p["spike"]), None)
@@ -636,6 +647,8 @@ def read_frame(image, ocr=None, known_agents=None):
                 weapon, score = identify_weapon(cell) if cell else (None, 0.0)
                 if weapon and score >= 0.55:
                     p["weapon"] = weapon
+                elif cell is None:
+                    p["weapon"] = ""   # empty loadout: no gun (don't keep last round's)
                 p["shield"] = shield_level(row_cell(frame, side, r, "shield", 4))
                 info = board.get((side, r)) or {}
                 if info.get("name"):
@@ -758,6 +771,24 @@ class ScreenReader:
             json.dump(update, f, indent=1)
         return base + ".png"
 
+    def _steady_score(self, update):
+        """A new score only counts once it's been read the same twice in a
+        row: one misread (10 -> 1 -> 10) would otherwise play round-win
+        banners and throw the HUD's buy-phase timing out."""
+        m = update["match"]
+        score = m.get("score")
+        if not score:
+            return
+        key = (score["left"], score["right"])
+        if key == getattr(self, "_score", None):
+            return
+        if key == getattr(self, "_score_pending", None):
+            self._score = key
+            return
+        self._score_pending = key
+        m.pop("score", None)
+        m.pop("round", None)
+
     def _learn_agents(self, update):
         """An agent counts once it's been seen three times in the same seat on
         the top bar (the scoreboard's rows are in score order, so they don't
@@ -783,6 +814,7 @@ class ScreenReader:
                 if image is not None:
                     update = read_frame(image, self.ocr, self.agents)
                     self._learn_agents(update)
+                    self._steady_score(update)
                     for p in update["players"]:
                         if (p["team"], p["slot"]) in self.agents:
                             p["agent"] = self.agents[(p["team"], p["slot"])]
