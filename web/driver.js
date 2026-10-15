@@ -123,7 +123,11 @@
         codes.left.push(r.winner === "left" ? WIN_CODE[r.win_type] || "2" : "0");
         codes.right.push(r.winner === "right" ? WIN_CODE[r.win_type] || "2" : "0");
       });
-      call("rounds", RoundTeams, [codes.left.join("|"), codes.right.join("|")]);
+      // Every round not played yet is "0" (the template reads a missing
+      // entry as a win and drops the round number into one row).
+      while (codes.left.length < 40) { codes.left.push("0"); codes.right.push("0"); }
+      // (The scores ride along so a new round redraws the round marker.)
+      call("rounds", RoundTeams, [codes.left.join("|"), codes.right.join("|"), m.score.left, m.score.right]);
       showBoard(wantBoard(m, cfg));
       return;
     }
