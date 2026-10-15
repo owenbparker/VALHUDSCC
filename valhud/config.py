@@ -19,6 +19,7 @@ RESOURCE_DIR = getattr(sys, "_MEIPASS", ROOT) if FROZEN else ROOT
 DATA_DIR = os.path.dirname(os.path.abspath(sys.executable)) if FROZEN else ROOT
 WEB_DIR = os.path.join(RESOURCE_DIR, "web")
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
+SPONSOR_DIR = os.path.join(DATA_DIR, "sponsors")   # uploaded sponsor logos (served as sponsors/...)
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
 
 DEFAULTS = {
@@ -53,6 +54,10 @@ DEFAULTS = {
 
     # Which screen the "HUD on the game" window covers (0 = main screen).
     "overlay_screen": 0,
+    # Sponsor logos rotating in the top right of the HUD, in order (paths
+    # like "sponsors/x.png"); empty: the template's own two. Seconds each.
+    "sponsors": [],
+    "sponsor_seconds": 4,
     # Observer client: the GFX PC whose HUD to show.
     "observer_url": "",
 }
@@ -111,6 +116,8 @@ def web_file(rel):
     candidates = []
     if rel.startswith("assets/logos/"):
         candidates.append((LOGO_DIR, rel[len("assets/logos/"):]))
+    if rel.startswith("sponsors/"):
+        candidates.append((SPONSOR_DIR, rel[len("sponsors/"):]))
     candidates.append((WEB_DIR, rel))
     # The scoreboard shares the HUD's agent, weapon and shield images.
     if rel.startswith("scoreboard/Resources/"):

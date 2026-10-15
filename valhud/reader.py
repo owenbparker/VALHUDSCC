@@ -54,8 +54,10 @@ class Frame:
     """A captured frame and the mapping from 1920x1080 coordinates to it."""
 
     def __init__(self, image):
+        # A capture of just the top of the window says how tall the whole was.
+        full = image.info.get("full_height", image.height) if hasattr(image, "info") else image.height
         self.image = image.convert("RGB")
-        self.k = self.image.height / REF_H
+        self.k = full / REF_H
         self.cx = self.image.width / 2
 
     def x(self, x):
@@ -777,8 +779,9 @@ def read_frame(image, ocr=None, known_agents=None):
 
 # --- capturing the game window ----------------------------------------------
 
-def capture_valorant():
-    """(image, None) with the VALORANT window's client area, or (None, reason)."""
+def capture_valorant(top=None):
+    """(image, None) with the VALORANT window's client area (only its top
+    `top` rows, in 1080p terms, if given), or (None, reason)."""
     import ctypes
     from ctypes import wintypes
     user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
@@ -808,7 +811,9 @@ def capture_valorant():
     from PIL import ImageGrab
     point = wintypes.POINT(0, 0)
     user32.ClientToScreen(hwnd, ctypes.byref(point))
-    image = ImageGrab.grab((point.x, point.y, point.x + width, point.y + height), all_screens=True)
+    rows = height if top is None else min(height, max(1, round(top * height / REF_H)))
+    image = ImageGrab.grab((point.x, point.y, point.x + width, point.y + rows), all_screens=True)
+    image.info["full_height"] = height
     return image, None
 
 
@@ -861,6 +866,7 @@ class ScreenReader:
             self._stop.clear()
             self._thread = threading.Thread(target=self._run, daemon=True)
             self._thread.start()
+            threading.Thread(target=self._run_alive, daemon=True).start()
             log("Reading VALORANT off the screen")
         elif not self.enabled:
             self._stop.set()
@@ -910,6 +916,33 @@ class ScreenReader:
                 elif name:
                     missed.append(name)
         return names, missed
+
+    ALIVE_EVERY = 0.1   # seconds between top-bar checks (deaths show within about this)
+    ALIVE_TOP = 92      # rows of the screen the health bars need (1080p)
+
+    def _run_alive(self):
+        """Deaths and health, fast: only the top bar's health bars, about ten
+        times a second, on their own (the full read, with text recognition,
+        takes a second or more). The full read leaves these to this loop."""
+        last, sent_at = None, 0.0
+        while not self._stop.is_set():
+            try:
+                image, reason = capture_valorant(top=self.ALIVE_TOP)
+                if image is not None:
+                    frame = Frame(image)
+                    players = []
+                    for side in ("left", "right"):
+                        for slot in range(1, 6):
+                            alive, health = health_bar(frame, side, slot)
+                            players.append({"team": side, "slot": slot, "alive": alive, "health": health})
+                    key = [(p["alive"], p["health"]) for p in players]
+                    if key != last or time.time() - sent_at > 1:
+                        self.send({"source": "screen", "players": players})
+                        last, sent_at = key, time.time()
+                    self.fast_at = time.time()
+            except Exception:
+                pass  # the full read reports problems
+            self._stop.wait(self.ALIVE_EVERY)
 
     def _buy_phase(self, update):
         """The buy phase runs from the BUY PHASE banner (whatever it says
@@ -974,6 +1007,11 @@ class ScreenReader:
                     self._learn_agents(update)
                     self._steady_score(update)
                     self._buy_phase(update)
+                    if time.time() - getattr(self, "fast_at", 0) < 2:
+                        # The fast loop has newer alive/health than this frame.
+                        for p in update["players"]:
+                            p.pop("alive", None)
+                            p.pop("health", None)
                     for p in update["players"]:
                         if (p["team"], p["slot"]) in self.agents:
                             p["agent"] = self.agents[(p["team"], p["slot"])]

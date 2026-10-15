@@ -75,6 +75,14 @@
   .fields div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; cursor: copy; }
   .fields span:last-child { color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
   .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .drop { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; }
+  .drop.over { border-color: var(--accent); color: var(--text); background: rgba(49,195,146,.06); }
+  .sponsor-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .sponsor { position: relative; width: 160px; height: 62px; background: #111 center/contain no-repeat; border: 1px solid var(--line); border-radius: 6px; }
+  .sponsor .n { position: absolute; left: 4px; top: 2px; font-size: 11px; color: var(--muted); }
+  .sponsor .tools { position: absolute; right: 2px; bottom: 2px; display: flex; gap: 2px; }
+  .sponsor .tools button { padding: 0 6px; font-size: 12px; line-height: 18px; }
+  button.primary { background: var(--accent); color: #06231a; border-color: var(--accent); font-weight: 600; }
   .checks label { display: flex; align-items: center; gap: 10px; margin: 0; padding: 8px 0; color: var(--text); font-size: 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
   .checks input { width: 18px; height: 18px; accent-color: var(--accent); }
   .checks .dot { width: 18px; height: 18px; box-shadow: none; display: inline-grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; }
@@ -168,6 +176,19 @@
       <span class="note" id="scan-result" style="margin:0">With the Tab scoreboard open in VALORANT (it's up in the buy phase): fills in every player's name from the game.</span>
     </div>
     <div class="players"><div id="players-left"></div><div id="players-right"></div></div>
+  </section>
+
+  <section class="wide">
+    <h2>Sponsors</h2>
+    <div id="sponsor-drop" class="drop" tabindex="0">Drop sponsor logos here, or <u>choose files</u>
+      <input type="file" id="sponsor-files" accept=".png,.jpg,.jpeg,.webp,.gif,.svg" multiple hidden></div>
+    <div id="sponsor-list" class="sponsor-list"></div>
+    <div class="row" style="margin-top:10px">
+      <label style="margin:0;flex:0 0 auto">Seconds each <input type="number" id="sponsor-seconds" min="1" max="60" step="0.5" style="width:70px"></label>
+      <button id="sponsor-save" class="primary" style="flex:0 0 auto">Save sponsors</button>
+      <span class="note" id="sponsor-note" style="margin:0"></span>
+    </div>
+    <p class="note">Rotate in the top right of the HUD, in this order. Saving puts them on the HUD now and makes them the rotation every time the app starts. With none, the HUD shows its own two.</p>
   </section>
 
   <section class="wide">
@@ -312,6 +333,59 @@ for (const side of ["left", "right"])
     post("/api/config", change);
   };
 $("reader").onchange = e => post("/api/reader", { enabled: e.target.checked });
+// Sponsors: edited here, put on the HUD (and kept for next launch) by Save.
+let sponsors = null, sponsorsSaved = "";
+function sponsorUrl(p) { return "/" + p.split("/").map(encodeURIComponent).join("/"); }
+function drawSponsors() {
+  const box = $("sponsor-list");
+  box.innerHTML = "";
+  sponsors.forEach((p, i) => {
+    const d = document.createElement("div");
+    d.className = "sponsor";
+    d.style.backgroundImage = `url("${sponsorUrl(p)}")`;
+    d.title = p.split("/").pop();
+    d.innerHTML = `<span class="n">${i + 1}</span><span class="tools"><button title="Earlier">◀</button><button title="Later">▶</button><button title="Remove">✕</button></span>`;
+    const [back, fwd, del] = d.querySelectorAll("button");
+    back.onclick = () => { if (i > 0) { [sponsors[i - 1], sponsors[i]] = [sponsors[i], sponsors[i - 1]]; drawSponsors(); } };
+    fwd.onclick = () => { if (i < sponsors.length - 1) { [sponsors[i + 1], sponsors[i]] = [sponsors[i], sponsors[i + 1]]; drawSponsors(); } };
+    del.onclick = () => { sponsors.splice(i, 1); drawSponsors(); };
+    box.appendChild(d);
+  });
+  const changed = JSON.stringify([sponsors, Number($("sponsor-seconds").value)]) !== sponsorsSaved;
+  $("sponsor-note").textContent = changed ? "Not saved yet" : (sponsors.length ? `${sponsors.length} on the HUD` : "The HUD's own two");
+  $("sponsor-note").className = "note" + (changed ? " warn" : "");
+}
+async function addSponsorFiles(files) {
+  for (const file of files) {
+    if (!/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) continue;
+    const data = await new Promise(res => { const r = new FileReader(); r.onload = () => res(r.result.split(",")[1]); r.readAsDataURL(file); });
+    const r = await (await fetch("/api/sponsor", { method: "POST", headers: { "Content-Type": "application/json" },
+                                                  body: JSON.stringify({ filename: file.name, data }) })).json();
+    if (r.error) { alert(r.error); continue; }
+    sponsors.push(r.path);
+    drawSponsors();
+  }
+}
+const drop = $("sponsor-drop");
+drop.onclick = () => $("sponsor-files").click();
+$("sponsor-files").onchange = e => { addSponsorFiles([...e.target.files]); e.target.value = ""; };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); addSponsorFiles([...e.dataTransfer.files]); };
+$("sponsor-seconds").oninput = drawSponsors;
+$("sponsor-save").onclick = async () => {
+  await post("/api/sponsors", { sponsors, seconds: Number($("sponsor-seconds").value) || 4 });
+  sponsorsSaved = JSON.stringify([sponsors, Number($("sponsor-seconds").value)]);
+  drawSponsors();
+};
+function applySponsors(cfg) {
+  if (sponsors !== null) return;  // loaded once; then edited here until saved
+  sponsors = [...(cfg.sponsors || [])];
+  $("sponsor-seconds").value = cfg.sponsor_seconds || 4;
+  sponsorsSaved = JSON.stringify([sponsors, Number($("sponsor-seconds").value)]);
+  drawSponsors();
+}
+
 $("reader-save").onclick = () => post("/api/reader/save", {});
 $("scan-names").onclick = async () => {
   $("scan-names").disabled = true;
@@ -337,6 +411,7 @@ for (const side of ["left", "right"]) {
 }
 
 function apply(s) {
+  applySponsors(s.config);
   const first = !state;
   state = s;
   const cfg = s.config, g = s.game, m = g.match, app = s.app;

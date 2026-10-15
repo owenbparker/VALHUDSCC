@@ -86,6 +86,30 @@
     }
   }
 
+  // Sponsors (top right): the logos saved in the control panel, in turn
+  // (the template's own two until some are saved).
+  if (!SCOREBOARD && typeof SponsorTimer !== "undefined") clearInterval(SponsorTimer);
+  var sponsor = { key: "", i: 0, timer: null };
+  function setSponsors(list, seconds) {
+    var logo = document.querySelector(".SponsorsLogo"), box = document.querySelector(".Sponsors");
+    if (SCOREBOARD || !logo) return;
+    var paths = (list && list.length ? list : ["hud/Resources/Sponsors/Sponsor1.png", "hud/Resources/Sponsors/Sponsor2.png"])
+      .map(function (p) { return "/" + String(p).split("/").map(encodeURIComponent).join("/"); });
+    var key = JSON.stringify([paths, seconds]);
+    if (key === sponsor.key) return;
+    sponsor.key = key;
+    sponsor.i = 0;
+    clearInterval(sponsor.timer);
+    if (box) box.style.display = "block";
+    Object.assign(logo.style, { backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center" });
+    function next() {
+      logo.style.backgroundImage = 'url("' + paths[sponsor.i % paths.length] + '")';
+      sponsor.i++;
+    }
+    next();
+    if (paths.length > 1) sponsor.timer = setInterval(next, Math.max(1, Number(seconds) || 4) * 1000);
+  }
+
   var WIN_CODE = { Deactivation: "1", Elimination: "2", Time: "3", Detonation: "4" };
 
   function applyState(s) {
@@ -173,6 +197,7 @@
     call("atttimeout", AttTimeOut, [cfg.timeout_call === "right"]);
     call("techpause", TechnicalPause, [!!cfg.tech_pause]);
     showBoard(wantBoard(m, cfg));
+    setSponsors(cfg.sponsors, cfg.sponsor_seconds);
   }
 
   function poll() {
