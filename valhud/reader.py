@@ -102,15 +102,42 @@ def _ncc(a, b):
     return float((a * b).sum() / d) if d else 0.0
 
 
-def identify_agent(crop, sizes, slack=3, agents=None):
+# Real spectator portraits for agents whose HUD art looks too unlike them
+# (web/reader_refs/<Agent>-top*.png for the top bar, -row*.png for the
+# scoreboard): cut from real frames, a few pixels inside the portrait.
+REFS_DIR = os.path.join(WEB_DIR, "reader_refs")
+_refs = {}
+
+
+def _agent_refs(agent, kind):
+    np = _np()
+    from PIL import Image
+    key = (agent, kind)
+    if key not in _refs:
+        _refs[key] = []
+        if kind and os.path.isdir(REFS_DIR):
+            for name in sorted(os.listdir(REFS_DIR)):
+                if name.lower().startswith(f"{agent}-{kind}".lower()) and name.endswith(".png"):
+                    img = Image.open(os.path.join(REFS_DIR, name)).convert("RGB")
+                    _refs[key].append(np.asarray(img, dtype=np.float32))
+    return _refs[key]
+
+
+def identify_agent(crop, sizes, slack=3, agents=None, kind=None):
     """[(score, agent), ...] best first, for a portrait crop whose top-left is
-    roughly where the icon starts (within `slack` px)."""
+    roughly where the icon starts (within `slack` px). kind ("top"/"row")
+    also compares against real portraits from web/reader_refs."""
     np = _np()
     c = np.asarray(crop, dtype=np.float32)
     H, W = c.shape[:2]
     out = []
     for agent in agents or game.AGENTS:
         best = -1.0
+        for ref in _agent_refs(agent, kind):
+            h, w = ref.shape[:2]
+            for dy in range(0, H - h + 1):
+                for dx in range(0, W - w + 1):
+                    best = max(best, _ncc(c[dy:dy + h, dx:dx + w].ravel(), ref.ravel()))
         for s in sizes:
             rgb, mask = _agent_icon(agent, s)
             for dy in range(-slack, slack + 1):
@@ -219,6 +246,23 @@ def top_portrait(frame, side, slot):
 
 
 # --- the scoreboard ---------------------------------------------------------
+
+def attacking_side(frame):
+    """Which team attacks, from the top bar: defenders' half is teal,
+    attackers' red. None if it can't be told (top bar not on screen)."""
+    def tint(x0, x1):
+        data = _pixels(frame.crop(x0, 34, x1, 66))
+        teal = sum(1 for p in data if p[1] > p[0] + 30 and p[2] > p[0] + 15)
+        red = sum(1 for p in data if p[0] > p[1] + 40 and p[0] > p[2] + 30)
+        return teal / max(1, len(data)), red / max(1, len(data))
+    lt, lr = tint(TOP_X["left"][0] - 40, TOP_X["left"][-1] + 30)
+    rt, rr = tint(TOP_X["right"][0] - 30, TOP_X["right"][-1] + 40)
+    if lr > 0.15 and rt > 0.15 and lr > lt and rt > rr:
+        return "left"
+    if lt > 0.15 and rr > 0.15 and lt > lr and rr > rt:
+        return "right"
+    return None
+
 
 def scoreboard_open(frame):
     """Is the Tab scoreboard on screen? (teal rows above red rows)"""
@@ -527,12 +571,12 @@ def read_frame(image, ocr=None, known_agents=None):
                 # The top bar is the only place a seat's agent is certain:
                 # check the agent known for it still matches, else look again.
                 portrait = top_portrait(frame, side, slot)
-                if agent and identify_agent(portrait, (40, 42), agents=[agent])[0][0] < 0.5:
+                if agent and identify_agent(portrait, (40, 42), agents=[agent], kind="top")[0][0] < 0.5:
                     agent = None
                 if agent:
                     seen.append((side, slot, agent))
                 else:
-                    best = identify_agent(portrait, (40, 42))
+                    best = identify_agent(portrait, (40, 42), kind="top")
                     if clear_match(best):
                         agent = best[0][1]
                         seen.append((side, slot, agent))
@@ -541,6 +585,9 @@ def read_frame(image, ocr=None, known_agents=None):
                 top_agents[(side, slot)] = agent
             players.append(p)
     update = {"source": "screen", "match": {}, "players": players, "seen_agents": seen}
+    side = attacking_side(frame)
+    if side:
+        update["match"]["attackers"] = side
     planted = spike_planted(frame)
     update["match"]["spike"] = {"state": "planted"} if planted else {}
     carrier = next(((p["team"], p["slot"]) for p in players if p["spike"]), None)
@@ -561,7 +608,7 @@ def read_frame(image, ocr=None, known_agents=None):
             row_agents = {}
             team = [a for (t, _), a in (known_agents or {}).items() if t == side]
             for r in range(5):
-                best = identify_agent(row_cell(frame, side, r, "portrait"), (32, 34, 36),
+                best = identify_agent(row_cell(frame, side, r, "portrait"), (32, 34, 36), kind="row",
                                       agents=team if len(set(team)) == 5 else None)
                 row_agents[r] = best[0][1] if clear_match(best) else None
             # The rows are sorted by score, not in top-bar order: each row

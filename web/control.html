@@ -344,7 +344,10 @@ function apply(s) {
       setIfIdle($(`pname-${side}-${i}`), (cfg.player_names[side] || [])[i - 1] || "");
       $(`pname-${side}-${i}`).placeholder = p.name || `Player ${i}`;
       const img = p.agent ? `/hud/Resources/Agentes/${p.agent}/${p.agent}.png` : "";
-      if ($(`pimg-${side}-${i}`).getAttribute("src") !== img) $(`pimg-${side}-${i}`).setAttribute("src", img);
+      const pimg = $(`pimg-${side}-${i}`);
+      if ((pimg.getAttribute("src") || "") !== img) img ? pimg.setAttribute("src", img) : pimg.removeAttribute("src");
+      pimg.style.visibility = img ? "" : "hidden";  // not known yet: a blank, not a broken picture
+      pimg.title = p.agent || "Agent not recognised yet";
       $(`pinfo-${side}-${i}`).textContent = p.agent ? `${p.alive ? p.health + " HP" : "dead"} · ¤${p.credits} · ${p.kills}/${p.deaths}/${p.assists}` : "";
     }
   }

@@ -146,6 +146,9 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(got[("left", 4)], ("Cypher", "Stinger"))
         self.assertEqual(got[("left", 5)], ("Fade", "Guardian"))
         self.assertEqual([got[("right", s)][1] for s in range(1, 6)], ["Phantom", "Vandal", "Vandal", "Phantom", "Vandal"])
+        self.assertEqual(got[("right", 4)][0], "Chamber")   # from a real portrait (web/reader_refs)
+        # The left team's half of the top bar is teal: they defend.
+        self.assertEqual(update["match"]["attackers"], "right")
         # Wrong agents remembered for a seat are corrected from the top bar.
         update = read_frame(frame, known_agents={("left", 1): "Omen"})
         self.assertIn(("left", 1, "Phoenix"), update["seen_agents"])
