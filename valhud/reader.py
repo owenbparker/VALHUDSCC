@@ -129,6 +129,12 @@ def identify_agent(crop, sizes, slack=3, agents=None):
     return out
 
 
+def clear_match(best):
+    """A good match, or a fair one well ahead of the next agent."""
+    (top, _), (second, _) = best[0], best[1] if len(best) > 1 else (-1.0, None)
+    return (top >= 0.6 and top - second >= 0.05) or (top >= 0.5 and top - second >= 0.15)
+
+
 def _silhouette(mask, size=(72, 24)):
     np = _np()
     from PIL import Image
@@ -183,7 +189,8 @@ def health_bar(frame, side, slot):
     """(alive, health 0-100) from the bar under a portrait."""
     x = TOP_X[side][slot - 1]
     strip = frame.crop(x - BAR_HALF, BAR_Y[0], x + BAR_HALF, BAR_Y[1])
-    cols = [any(min(strip.getpixel((cx, cy))) >= 170 for cy in range(strip.height)) for cx in range(strip.width)]
+    # White when healthy, red when low: any bright pixel is bar.
+    cols = [any(max(strip.getpixel((cx, cy))) >= 170 for cy in range(strip.height)) for cx in range(strip.width)]
     lit = sum(cols)
     if lit < 2:
         return False, 0
@@ -227,6 +234,38 @@ def row_cell(frame, side, row, col, pad=0):
     x0, x1 = COLS[col]
     y0 = ROW_TOP[side] + ROW_H * row
     return frame.crop(x0, y0 + pad, x1, y0 + ROW_H - pad)
+
+
+# Where the gun can be in a row: from the assists column to before the
+# credits. Its column moves a little between scoreboard layouts, so the gun
+# is found in this strip rather than at a fixed place.
+WEAPON_STRIP = (1030, 1250)
+
+
+def weapon_cell(frame, side, row):
+    """The gun icon in a scoreboard row, or None: the widest solid white
+    shape in the strip (the assists digits and the shield icon are narrower;
+    rifles reach further right than pistols)."""
+    np = _np()
+    y0 = ROW_TOP[side] + ROW_H * row
+    strip = frame.crop(WEAPON_STRIP[0], y0 + 4, WEAPON_STRIP[1], y0 + ROW_H - 4)
+    cols = (np.asarray(strip.convert("L")) > 170).any(axis=0)
+    runs, start, last = [], None, None
+    for x, lit in enumerate(cols):
+        if lit:
+            if start is None:
+                start = x
+            elif x - last > 4:   # a gap: the next shape
+                runs.append((start, last))
+                start = x
+            last = x
+    if start is not None:
+        runs.append((start, last))
+    runs = [(a, b) for a, b in runs if b - a + 1 >= 26]
+    if not runs:
+        return None
+    a, b = max(runs, key=lambda r: r[1] - r[0])
+    return strip.crop((a, 0, b + 1, strip.height))
 
 
 def shield_level(cell):
@@ -405,6 +444,17 @@ def read_score_line(frame, ocr):
     return out
 
 
+_TAG = re.compile(r"^\S{1,8}(?:\s+\S{1,4})?\s*[|\u00a6\u2502]\s*|^\S{1,8}\s+[Il1!]\s+(?=\S)")
+
+
+def player_name(text):
+    """The name without a team tag the text recognition still caught
+    ("FIT | Panda Nate", "HII I Panda Nate" -> "Panda Nate")."""
+    text = " ".join(text.split())
+    rest = _TAG.sub("", text, count=1)
+    return rest if len(rest) >= 2 else text
+
+
 def read_scoreboard(frame, ocr):
     """Per row (left rows 0-4, right rows 0-4): name, ult, K/D/A, credits."""
     rows = {}
@@ -412,10 +462,11 @@ def read_scoreboard(frame, ocr):
     for side in ("left", "right"):
         top = ROW_TOP[side]
         x0, x1 = COLS["name"]
-        words = ocr.words(ink(frame.crop(x0, top, x1, top + 5 * ROW_H), 2, 150))
+        # White text only: the grey team tag before the name ("FAPP | ") drops out.
+        words = ocr.words(ink(frame.crop(x0, top, x1, top + 5 * ROW_H), 2, 200))
         for r in range(5):
             mine = sorted((cx, t) for t, cx, cy in words if r * ROW_H <= cy / 2 < (r + 1) * ROW_H)
-            rows[(side, r)] = {"name": " ".join(t for _, t in mine).strip()}
+            rows[(side, r)] = {"name": player_name(" ".join(t for _, t in mine))}
     # Numbers: one labelled line per player.
     h, spacing, lines, keys = ROW_H * 2, 24, [], []
     for side in ("left", "right"):
@@ -465,21 +516,31 @@ def read_frame(image, ocr=None, known_agents=None):
     frame = Frame(image)
     players = []
     top_agents = {}
+    seen = []   # agents recognised on the top bar in this frame (the reader learns from these)
     for side in ("left", "right"):
         for slot in range(1, 6):
             alive, health = health_bar(frame, side, slot)
             p = {"team": side, "slot": slot, "alive": alive, "health": health,
                  "spike": alive and carries_spike(frame, side, slot)}
             agent = (known_agents or {}).get((side, slot))
-            if not agent and alive:
-                best = identify_agent(top_portrait(frame, side, slot), (40, 42))
-                if best[0][0] >= 0.6 and best[0][0] - best[1][0] >= 0.05:
-                    agent = best[0][1]
+            if alive:
+                # The top bar is the only place a seat's agent is certain:
+                # check the agent known for it still matches, else look again.
+                portrait = top_portrait(frame, side, slot)
+                if agent and identify_agent(portrait, (40, 42), agents=[agent])[0][0] < 0.5:
+                    agent = None
+                if agent:
+                    seen.append((side, slot, agent))
+                else:
+                    best = identify_agent(portrait, (40, 42))
+                    if clear_match(best):
+                        agent = best[0][1]
+                        seen.append((side, slot, agent))
             if agent:
                 p["agent"] = agent
                 top_agents[(side, slot)] = agent
             players.append(p)
-    update = {"source": "screen", "match": {}, "players": players}
+    update = {"source": "screen", "match": {}, "players": players, "seen_agents": seen}
     planted = spike_planted(frame)
     update["match"]["spike"] = {"state": "planted"} if planted else {}
     carrier = next(((p["team"], p["slot"]) for p in players if p["spike"]), None)
@@ -502,23 +563,31 @@ def read_frame(image, ocr=None, known_agents=None):
             for r in range(5):
                 best = identify_agent(row_cell(frame, side, r, "portrait"), (32, 34, 36),
                                       agents=team if len(set(team)) == 5 else None)
-                row_agents[r] = best[0][1] if best[0][0] >= 0.6 else None
+                row_agents[r] = best[0][1] if clear_match(best) else None
+            # The rows are sorted by score, not in top-bar order: each row
+            # goes to the seat with the same agent. A row is only used when
+            # that's certain (or it's the last row left for the last seat),
+            # so a name or loadout never lands on the wrong player.
             free = [s for s in range(1, 6)]
             assign = {}
+            seats_of = {}
+            for s_ in range(1, 6):
+                seats_of.setdefault(top_agents.get((side, s_)), []).append(s_)
             for r, agent in row_agents.items():
-                slot = next((s for s in free if top_agents.get((side, s)) == agent), None)
-                if slot:
-                    assign[r] = slot
-                    free.remove(slot)
-            for r in range(5):
-                if r not in assign and free:
-                    assign[r] = free.pop(0)
+                seats = [s_ for s_ in seats_of.get(agent, []) if s_ in free] if agent else []
+                if len(seats) == 1 and list(row_agents.values()).count(agent) == 1:
+                    assign[r] = seats[0]
+                    free.remove(seats[0])
+            left_rows = [r for r in range(5) if r not in assign]
+            if len(left_rows) == 1 and len(free) == 1:
+                assign[left_rows[0]] = free[0]
             for r, slot in assign.items():
                 p = by_slot[(side, slot)]
                 if row_agents[r]:
                     p["agent"] = row_agents[r]
-                weapon, score = identify_weapon(row_cell(frame, side, r, "weapon", 4))
-                if weapon and score >= 0.6:
+                cell = weapon_cell(frame, side, r)
+                weapon, score = identify_weapon(cell) if cell else (None, 0.0)
+                if weapon and score >= 0.55:
                     p["weapon"] = weapon
                 p["shield"] = shield_level(row_cell(frame, side, r, "shield", 4))
                 info = board.get((side, r)) or {}
@@ -627,11 +696,30 @@ class ScreenReader:
     def stop(self):
         self._stop.set()
 
+    def save_frame(self, folder):
+        """Capture the screen as the reader sees it and save it with what was
+        read from it (for checking and tuning the reader). Returns the path."""
+        import json
+        image, reason = capture_valorant()
+        if image is None:
+            raise ValueError(reason)
+        update = read_frame(image, self.ocr, self.agents)
+        os.makedirs(folder, exist_ok=True)
+        base = os.path.join(folder, time.strftime("frame-%Y%m%d-%H%M%S"))
+        image.save(base + ".png")
+        with open(base + ".json", "w", encoding="utf-8") as f:
+            json.dump(update, f, indent=1)
+        return base + ".png"
+
     def _learn_agents(self, update):
-        """An agent counts once it's been seen three times in the same slot."""
-        for p in update["players"]:
-            key, agent = (p["team"], p["slot"]), p.get("agent")
-            if not agent or self.agents.get(key) == agent:
+        """An agent counts once it's been seen three times in the same seat on
+        the top bar (the scoreboard's rows are in score order, so they don't
+        say which seat is which). A seat whose agent changes, e.g. in the
+        next game, is learned again the same way."""
+        for side, slot, agent in update.pop("seen_agents", []):
+            key = (side, slot)
+            if self.agents.get(key) == agent:
+                self._agent_votes.pop(key, None)
                 continue
             votes = self._agent_votes.setdefault(key, {})
             votes[agent] = votes.get(agent, 0) + 1

@@ -38,7 +38,9 @@ ULT_MAX = {"Astra": 7, "Breach": 8, "Brimstone": 8, "Chamber": 8, "Clove": 8, "C
 # Weapon image names in web/hud/Resources/Armas, with their price.
 WEAPONS = {"Classic": 0, "Shorty": 300, "Frenzy": 450, "Ghost": 500, "Sheriff": 800, "Stinger": 1100,
            "Spectre": 1600, "Bucky": 850, "Judge": 1850, "Bulldog": 2050, "Guardian": 2250, "Phantom": 2900,
-           "Vandal": 2900, "Marshal": 950, "Outlaw": 2400, "Operator": 4700, "Ares": 1600, "Odin": 3200}
+           "Vandal": 2900, "Marshal": 950, "Outlaw": 2400, "Operator": 4700, "Ares": 1600, "Odin": 3200,
+           # Added to the game in 2025; its HUD image is traced from a spectator frame.
+           "Bandit": 600}
 
 _AGENT_LOOKUP = {a.lower(): a for a in AGENTS} | {"kay/o": "Kayo", "kay-o": "Kayo", "kayo": "Kayo"}
 _WEAPON_LOOKUP = {w.lower(): w for w in WEAPONS} | {"melee": "Knife", "knife": "Knife"}

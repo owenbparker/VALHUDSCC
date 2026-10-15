@@ -34,7 +34,7 @@ Runs the HUD.
 - **Show HUD on game:** the HUD in a see-through, click-through window on top of VALORANT. Use Windowed Fullscreen or Windowed, not exclusive Fullscreen.
 - **Outputs:**
   - `http://localhost:8778/overlay`: HUD (browser source, 1920x1080)
-  - `http://localhost:8778/scoreboard`: buy-phase scoreboard
+  - `http://localhost:8778/scoreboard`: buy-phase scoreboard on its own. The overlay above already carries it (it shows itself after each round and hides for the next), so you only need this one for a separate source; then add `?scoreboard=0` to the overlay's address so it isn't shown twice.
   - `http://localhost:8778/hud.csv`: data for vMix, also `/hud.json` and `/hud.xml`
   - **Let other PCs on the network read the HUD**
 
@@ -79,6 +79,8 @@ Dead players grey out.
 ## Live game data
 
 VALORANT has no official live-data API for spectators like League's. Riot keeps health, abilities and economy away from other programs because of its anti-cheat. Broadcast tools get them by reading the spectator's own player panels off the screen. That is the next step for this app: a screen reader like the League HUD's gold reader. It needs spectator screenshots to build against.
+
+**Reading the screen** (Live data -> Read VALORANT on this PC): the top bar gives who's alive, health (white or red bar), the spike and the score; each seat's agent is learned from the top bar portraits (and re-checked, so a mistake corrects itself). With the Tab scoreboard open (it is in the buy phase) it also reads names (without team tags), ult points, K/D/A, credits, guns and shields; its rows are in score order, so each is matched to its seat by agent. **Save frame** saves the screen as the reader sees it, with what it read, to the `frames` folder: send those when something reads wrong.
 
 Anything that can read the match can already feed the HUD by POSTing JSON to `http://localhost:8778/api/ingest`. Only changed fields need sending:
 

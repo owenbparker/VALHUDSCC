@@ -128,6 +128,34 @@ class ReaderTests(unittest.TestCase):
         self.assertEqual(update["match"]["spike"]["state"], "")
         self.assertTrue(update["match"]["scoreboard_open"])
 
+    def test_reads_rifles_and_seats_rows_by_agent(self):
+        # A real spectator frame (round 3, buy phase): rifles, SMGs and the
+        # Bandit; scoreboard rows in score order, not top-bar order.
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        from PIL import Image
+        from valhud.reader import read_frame
+        frame = Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "tab_scoreboard_rifles.png"))
+        update = read_frame(frame)
+        got = {(p["team"], p["slot"]): (p.get("agent"), p.get("weapon")) for p in update["players"]}
+        self.assertEqual(got[("left", 1)], ("Phoenix", "Bulldog"))
+        self.assertEqual(got[("left", 2)], ("Neon", "Bandit"))
+        self.assertEqual(got[("left", 3)], ("Brimstone", "Ghost"))
+        self.assertEqual(got[("left", 4)], ("Cypher", "Stinger"))
+        self.assertEqual(got[("left", 5)], ("Fade", "Guardian"))
+        self.assertEqual([got[("right", s)][1] for s in range(1, 6)], ["Phantom", "Vandal", "Vandal", "Phantom", "Vandal"])
+        # Wrong agents remembered for a seat are corrected from the top bar.
+        update = read_frame(frame, known_agents={("left", 1): "Omen"})
+        self.assertIn(("left", 1, "Phoenix"), update["seen_agents"])
+
+    def test_player_names_lose_team_tags(self):
+        from valhud.reader import player_name
+        self.assertEqual(player_name("FIT | Panda Nate"), "Panda Nate")
+        self.assertEqual(player_name("HII I Panda Nate"), "Panda Nate")
+        self.assertEqual(player_name("woddy"), "woddy")
+
     def test_feed_turns_into_state(self):
         s = game.merge(game.empty_state(), {"players": [{"team": "left", "slot": 3, "alive": False, "health": 0}]})
         self.assertFalse(s["players"][2]["alive"])

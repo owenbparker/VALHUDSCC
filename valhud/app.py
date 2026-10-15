@@ -205,7 +205,8 @@ class HudApp:
         return "0.0.0.0" if cfg.get("allow_network") else cfg["http_host"]
 
     def open_folder(self, which):
-        folders = {"output": self.config.output_dir(), "logos": LOGO_DIR, "app": DATA_DIR}
+        folders = {"output": self.config.output_dir(), "logos": LOGO_DIR, "app": DATA_DIR,
+                   "frames": os.path.join(DATA_DIR, "frames")}
         path = folders[which]
         os.makedirs(path, exist_ok=True)
         if sys.platform == "win32":
@@ -386,6 +387,10 @@ def make_handler(app):
                     if body.get("url") is not None:
                         app.config.update({"observer_url": body["url"]})
                     app.overlay_window.set(bool(body.get("open")), body.get("screen"), body.get("url"))
+                elif path == "/api/reader/save":
+                    saved = app.reader.save_frame(os.path.join(DATA_DIR, "frames"))
+                    log(f"Saved the screen and what was read from it: {saved}")
+                    app.open_folder("frames")
                 elif path == "/api/reader":
                     app.set_reader(body.get("enabled"))
                 elif path == "/api/role":

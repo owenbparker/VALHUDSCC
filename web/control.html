@@ -170,6 +170,10 @@
     <h2>Live data</h2>
     <label class="toggle"><input type="checkbox" id="reader"> Read VALORANT on this PC (spectator screen)</label>
     <div class="note" id="reader-status" style="margin:-4px 0 10px"></div>
+    <div class="row" style="margin-bottom:10px">
+      <button id="reader-save" style="flex:0 0 auto" title="Saves the VALORANT screen as the reader sees it, with what it read, to the frames folder (to send for tuning)">Save frame</button>
+      <span class="note" style="margin:0">Something read wrong? Save a frame at that moment (with the Tab scoreboard open, too) and send the files from the folder that opens.</span>
+    </div>
     <div class="feed" id="feed"></div>
     <details class="note" style="margin-top:8px">
       <summary>Sending live data to the HUD</summary>
@@ -304,6 +308,7 @@ for (const side of ["left", "right"])
     post("/api/config", change);
   };
 $("reader").onchange = e => post("/api/reader", { enabled: e.target.checked });
+$("reader-save").onclick = () => post("/api/reader/save", {});
 $("tech-pause").onclick = () => post("/api/config", { tech_pause: !state.config.tech_pause, timeout_call: "" });
 $("show-scoreboard").onclick = () => post("/api/config", { show: { scoreboard: !state.config.show.scoreboard } });
 $("show-timeouts").onchange = e => post("/api/config", { show: { timeouts: e.target.checked } });

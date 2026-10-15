@@ -3,7 +3,9 @@
 // only made when its arguments change, so animations aren't restarted.
 //
 // URL options: ?fit=1 scales the 1920x1080 page to the window (the desktop
-// app's HUD-on-the-game window).
+// app's HUD-on-the-game window); ?scoreboard=0 leaves out the buy-phase
+// scoreboard, which the HUD otherwise carries (for when it's a separate
+// browser source).
 (function () {
   var SCOREBOARD = location.pathname.indexOf("/scoreboard") === 0;
   var params = new URLSearchParams(location.search);
@@ -118,6 +120,19 @@
       .then(applyState)
       .catch(function () {})
       .then(function () { setTimeout(poll, 250); });
+  }
+
+  // The buy-phase scoreboard is its own page (web/scoreboard): it shows
+  // itself after each round and hides for the next one. The HUD carries it,
+  // so the HUD window (and a single browser source) has it too.
+  if (!SCOREBOARD && params.get("scoreboard") !== "0") {
+    var board = document.createElement("iframe");
+    board.src = "/scoreboard";
+    board.title = "Scoreboard";
+    board.setAttribute("scrolling", "no");
+    Object.assign(board.style, { position: "absolute", left: "0", top: "0", width: "1920px", height: "1080px",
+                                 border: "0", background: "transparent", pointerEvents: "none", zIndex: "50" });
+    (document.body || document.documentElement).appendChild(board);
   }
 
   if (params.get("fit") === "1") {
