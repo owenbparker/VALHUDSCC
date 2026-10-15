@@ -15,7 +15,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import game, outputs
+from . import game, outputs, recolor
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
 from .demo import DemoGame
 from .log import log, since
@@ -55,6 +55,8 @@ class HudApp:
         self._stop = threading.Event()
         self._was_connected = None
         self._last_round = None
+        # The observer client's reading of who it's spectating: (text, time).
+        self.spectating = ("", 0.0)
 
     def set_mode(self, mode, speed=None):
         """Switch between the live feed ("live") and a simulated match ("demo")."""
@@ -87,9 +89,9 @@ class HudApp:
                                          json.dumps(update).encode("utf-8"), {"Content-Type": "application/json"})
             opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
             with opener.open(req, timeout=3) as r:
-                r.read()
+                return json.loads(r.read() or b"{}")
         else:
-            self.ingest(update)
+            return self.ingest(update)
 
     def set_reader(self, enabled):
         self.config.update({"screen_reader": bool(enabled)})
@@ -101,14 +103,33 @@ class HudApp:
 
     def ingest(self, update):
         """Live data from a feed (screen reader, Overwolf app, another tool)."""
+        if isinstance(update, dict) and isinstance(update.get("spectating"), dict):
+            update = dict(update)
+            self.spectating = (str(update.pop("spectating").get("text") or ""), time.time())
+            if not update.get("match") and not update.get("players"):
+                self.refresh(fetch=False)
+                return self.observed_name()
         self.feed.apply(update)
         if self.mode == "live":
             self.refresh()
+        return self.observed_name()
+
+    SPECTATING_FOR = 3.0   # seconds a reading counts for (the observer sends one a second at least)
+
+    def observed_name(self):
+        """{"observed": name of the player the observer is spectating, or None}."""
+        with self._lock:
+            o = self.state["match"].get("observed")
+            p = next((p for p in self.state["players"] if o and (p["team"], p["slot"]) == (o["team"], o["slot"])), None)
+        return {"ok": True, "observed": p["name"] if p else None}
 
     def refresh(self, fetch=True):
         cfg = self.config.get()
         raw = self.source.fetch() if fetch else self.source.state
         state = game.with_overrides(raw, cfg)
+        text, at = self.spectating
+        if time.time() - at < self.SPECTATING_FOR:
+            state["match"]["observed"] = game.observed_player(state, text)
         fields = game.fields(state, cfg)
         with self._lock:
             self.state, self.fields = state, fields
@@ -301,6 +322,13 @@ def make_handler(app):
             if not path:
                 return self._send('{"error":"not found"}', status=404)
             ctype = mimetypes.guess_type(path)[0] or "application/octet-stream"
+            try:
+                body = recolor.served(path, unquote(rel), recolor.colours(app.config.get()))
+            except Exception as e:
+                log(f"Couldn't recolour {rel}: {e!r}", "warn")
+                body = None
+            if body is not None:
+                return self._send(body, ctype)
             size = os.path.getsize(path)
             span = parse_range(self.headers.get("Range"), size)
             if span is None and size < 8 * 1024 * 1024:
@@ -401,8 +429,7 @@ def make_handler(app):
                     app.open_folder(body["folder"])
                 elif path == "/api/ingest":
                     # Live match data (partial updates, see valhud/game.py).
-                    app.ingest(body)
-                    return self._send('{"ok":true}')
+                    return self._send(json.dumps(app.ingest(body)))
                 elif path == "/api/update/check":
                     app.updater.check()
                 elif path == "/api/update/install":
@@ -426,6 +453,8 @@ def make_handler(app):
                     saved = app.reader.save_frame(os.path.join(DATA_DIR, "frames"))
                     log(f"Saved the screen and what was read from it: {saved}")
                     app.open_folder("frames")
+                elif path == "/api/reader/spectate":
+                    app.reader.set_spectate(body.get("enabled"))
                 elif path == "/api/reader":
                     app.set_reader(body.get("enabled"))
                 elif path == "/api/role":

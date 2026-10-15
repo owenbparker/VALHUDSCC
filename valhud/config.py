@@ -38,6 +38,10 @@ DEFAULTS = {
     "left": {"name": "Team Left", "tricode": "SCC", "logo": "assets/logos/scc.png", "wins": 0, "color": "#2fc7a6"},
     "right": {"name": "Team Right", "tricode": "OPP", "logo": "assets/logo_right.png", "wins": 0, "color": "#e3475a"},
     "best_of": 3,
+    # The HUD's two side colours (the templates' teal and red); they still
+    # swap at half time. See valhud/recolor.py.
+    "defense_color": "#00ffcc",
+    "attack_color": "#ff4e5d",
     # Which team attacks in the first half: "left" or "right".
     "attack_first": "left",
     # The maps of the series, in order; "winner" is "left", "right" or "".

@@ -99,12 +99,54 @@ class ServerTests(unittest.TestCase):
                 self.assertIn("test", state["app"]["feed"]["sources"])
                 csv = urllib.request.urlopen("http://127.0.0.1:8795/hud.csv", timeout=5).read().decode()
                 self.assertIn("LEFT P1 CREDITS", csv)
+                # The observer client's reading of who it's spectating.
+                names = {"left": ["Ace", "Bolt", "", "", ""], "right": ["", "Grit", "", "", ""]}
+                cfg.update({"player_names": names})
+                reply = post("/api/ingest", {"source": "observer", "spectating": {"text": "SCC Grit 100 50"}})
+                self.assertEqual(reply["observed"], "Grit")
+                state = json.loads(urllib.request.urlopen("http://127.0.0.1:8795/api/state", timeout=5).read())
+                self.assertEqual(state["game"]["match"]["observed"], {"team": "right", "slot": 2})
+                self.assertIsNone(post("/api/ingest", {"spectating": {"text": ""}})["observed"])
+                # Side colours: the template is served recoloured.
+                css = lambda: urllib.request.urlopen("http://127.0.0.1:8795/hud/Extra.js", timeout=5).read().decode()
+                self.assertIn("'#00ffcc'", css())
+                post("/api/config", {"defense_color": "#3a7bff"})
+                self.assertIn("'#3a7bff'", css())
+                self.assertIn("#ff4e5d", css())   # the other colour untouched
                 for path in ("/overlay", "/scoreboard"):
                     page = urllib.request.urlopen(f"http://127.0.0.1:8795{path}", timeout=5)
                     self.assertIn("/Console.html", page.geturl())
                     self.assertIn(b"/driver.js", page.read())
             finally:
                 app.stop()
+
+
+class ColourTests(unittest.TestCase):
+    def test_recolour(self):
+        from valhud import recolor
+        plan = recolor._plan({"defense_color": "#3a7bff", "attack_color": "#ffb020"})
+        self.assertEqual(recolor.recolour_text("a: #00ffcc; b: rgb(0, 95, 75); c: #c3c3c3; d: #d6ca97ff", plan),
+                         "a: #3a7bff; b: rgb(22, 47, 95); c: #c3c3c3; d: #d6ca97ff")   # greys and gold stay
+        self.assertEqual(recolor.recolour_text("#ff4e5d", plan), "#ffb020")
+        self.assertTrue(recolor.applies("hud/styles.css"))
+        self.assertTrue(recolor.applies("scoreboard/Resources/HUD-1.png"))
+        self.assertFalse(recolor.applies("hud/Resources/Agentes/Jett/icon.png"))
+        self.assertFalse(recolor.applies("control.html"))
+        self.assertEqual(recolor.colours({"defense_color": "#00ffcc", "attack_color": "#FFB020"}),
+                         {"attack_color": "#ffb020"})
+
+
+class ObservedTests(unittest.TestCase):
+    def test_observed_player(self):
+        s = game.empty_state()
+        for p, n in zip(s["players"], ["twitch crunch", "tokyo", "Bearrett", "Instxnct", "dedmos",
+                                       "taipei", "shufu", "Weegle", "Twitch Notexxd", "payne"]):
+            p["name"] = n
+        self.assertEqual(game.observed_player(s, "FAPP | Bearrett 100"), {"team": "left", "slot": 3})
+        self.assertEqual(game.observed_player(s, "FTU Twitch Notexxd 50 100"), {"team": "right", "slot": 4})
+        self.assertEqual(game.observed_player(s, "Bearet"), {"team": "left", "slot": 3})   # a misread
+        self.assertIsNone(game.observed_player(s, "100 50"))
+        self.assertIsNone(game.observed_player(s, ""))
 
 
 class ReaderTests(unittest.TestCase):

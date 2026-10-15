@@ -21,6 +21,8 @@ screen reader or anything that POSTs to /api/ingest.
 """
 
 import copy
+import difflib
+import re
 
 SIDES = ("left", "right")
 
@@ -65,7 +67,8 @@ def empty_state():
     return {"connected": False,
             "match": {"map": "", "round": 0, "phase": "", "timer": 0, "score": {"left": 0, "right": 0},
                       "attackers": "left", "spike": {"state": "", "timer": 0, "carrier": None},
-                      "round_winner": "", "win_type": "", "rounds": []},
+                      "round_winner": "", "win_type": "", "rounds": [],
+                      "observed": None},   # {"team", "slot"}: who the observer is spectating
             "players": [empty_player(t, s) for t in SIDES for s in range(1, 6)]}
 
 
@@ -82,6 +85,9 @@ def merge(state, update):
     "slot": 1, ...any player keys...}, ...]}. Unknown keys are ignored."""
     out = copy.deepcopy(state)
     m = update.get("match") or {}
+    o = m.get("observed", False)
+    if o is None or (isinstance(o, dict) and o.get("team") in SIDES and o.get("slot") in range(1, 6)):
+        out["match"]["observed"] = {"team": o["team"], "slot": o["slot"]} if o else None
     for key in ("map", "round", "phase", "timer", "attackers", "round_winner", "win_type", "rounds"):
         if key in m:
             out["match"][key] = m[key]
@@ -129,6 +135,39 @@ def with_overrides(state, cfg):
         if typed:
             p["name"] = typed
     return out
+
+
+def _norm(text):
+    return re.sub(r"[^a-z0-9]", "", str(text or "").lower())
+
+
+def observed_player(state, text):
+    """{"team", "slot"} of the player whose name is in `text` (what the
+    observer client read by the spectated player's health, team tag and all),
+    or None. Close spellings count (text recognition slips a letter)."""
+    words = [_norm(w) for w in re.split(r"[\s/|]+", str(text or ""))]
+    words = [w for w in words if w]
+    if not words:
+        return None
+    joined = "".join(words)
+    best, best_score = None, 0.0
+    for p in state["players"]:
+        name = _norm(p["name"])
+        if len(name) < 2:
+            continue
+        if name in joined and (len(name) >= 3 or name in words):
+            score = 1.0 + len(name) / 100   # the longest name inside wins
+        else:
+            # The name against each run of words (names can have spaces).
+            parts = [_norm(w) for w in str(p["name"]).split()] or [name]
+            k = max(1, len(parts))
+            score = max((difflib.SequenceMatcher(None, name, "".join(words[i:i + k])).ratio()
+                         for i in range(len(words))), default=0.0)
+        if score > best_score:
+            best, best_score = p, score
+    if best is None or best_score < 0.8:
+        return None
+    return {"team": best["team"], "slot": best["slot"]}
 
 
 def fields(state, cfg):

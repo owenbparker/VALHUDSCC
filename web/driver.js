@@ -56,6 +56,26 @@
   // from the bottom. Out: the scoreboard slides down, then the panels come
   // back. (The HUD page and the scoreboard page each do their half, from
   // the same state.)
+  function lowHealthStyle() {
+    if (document.getElementById("low-hp")) return;
+    var st = document.createElement("style");
+    st.id = "low-hp";
+    // (!important: the template restyles the panels every 50 ms.)
+    st.textContent =
+      ".low-hp > .rectangle-Team1 { background: linear-gradient(to right, rgb(112, 22, 32) 3%, rgb(38, 8, 12) 35%, rgb(0, 0, 0) 60%) !important; }" +
+      ".low-hp > .rectangle-Team2 { background: linear-gradient(to left, rgb(112, 22, 32) 3%, rgb(38, 8, 12) 35%, rgb(0, 0, 0) 60%) !important; }";
+    document.head.appendChild(st);
+  }
+  function boardArt() {
+    if (document.getElementById("board-art")) return;
+    var st = document.createElement("style");
+    st.id = "board-art";
+    st.textContent = "body { background-size: 0 0 !important; }" +
+      "body::before { content: ''; position: absolute; left: 0; top: 0; width: 1920px; height: 1080px;" +
+      " z-index: -1; pointer-events: none; background-image: inherit; background-repeat: no-repeat;" +
+      " background-size: 1920px 1080px; }";
+    document.head.appendChild(st);
+  }
   var PANELS_MS = 650, SLIDE_MS = 550, boardOn = null, boardTimer = null;
   function showBoard(on) {
     on = !!on;
@@ -64,9 +84,12 @@
     boardOn = on;
     clearTimeout(boardTimer);
     if (SCOREBOARD) {
-      // The slide moves the whole page (its top bar is the page background,
-      // which stays put). At rest nothing is moved at all: moving the
-      // scoreboard's own container shifts every piece positioned inside it.
+      // The slide moves the whole page. At rest nothing is moved at all:
+      // moving the scoreboard's own container shifts every piece positioned
+      // inside it. The panel art is the page background, which a browser
+      // paints on the canvas (it wouldn't move), so it's drawn on a layer of
+      // the page instead (see boardArt).
+      boardArt();
       var root = document.documentElement.style, OFF = "translateY(480px)";
       var slide = "transform " + SLIDE_MS + "ms cubic-bezier(.2,.8,.2,1)";
       if (on) {
@@ -125,6 +148,11 @@
   function applyState(s) {
     var g = s.game, m = g.match, cfg = s.config;
     SCC.state = s;  // SideRound() reads it
+    // New side colours: the app serves the template recoloured (see
+    // valhud/recolor.py), so the page loads again to pick them up.
+    var colours = [cfg.defense_color, cfg.attack_color].join();
+    if (sent.colours !== undefined && sent.colours !== colours) { location.reload(); return; }
+    sent.colours = colours;
 
     // Teams, logos, score, series.
     call("names", SetNameTeams, [cfg.left.name, cfg.left.tricode, cfg.right.name, cfg.right.tricode]);
@@ -187,6 +215,17 @@
       showBoard(wantBoard(m, cfg));
       return;
     }
+
+    // The player the observer is spectating: the template's own highlight
+    // (it draws the panel named by CameraIndex in gold). And anyone alive
+    // under 20 health: their panel is tinted red.
+    var o = m.observed;
+    CameraIndex = o ? (o.team === "left" ? "TIP" : "TDP") + o.slot : "";
+    lowHealthStyle();
+    g.players.forEach(function (p) {
+      var el = document.querySelector((p.team === "left" ? ".TIP" : ".TDP") + p.slot);
+      if (el) el.classList.toggle("low-hp", !!p.alive && p.health > 0 && p.health < 20);
+    });
 
     // The spike: planted animation, and who's carrying it.
     var planted = m.spike.state === "planted";

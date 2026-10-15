@@ -655,6 +655,27 @@ def read_scoreboard(frame, ocr):
     return rows
 
 
+# --- who the observer is spectating -----------------------------------------
+
+# Spectating a player, the game shows their name ("100T bang") at the bottom,
+# by their health. The whole stretch is read; the GFX PC matches the text to
+# its players' names (see game.observed_player). Free-cam shows no name.
+SPECTATED_TEXT = (440, 940, 1000, 1004)
+
+
+def spectated_text(frame, ocr):
+    """The text by the spectated player's health (their name, with the team
+    tag and the health digits around it), or ""."""
+    crop = frame.crop(*SPECTATED_TEXT)
+    seen = []
+    for level in (150, 185):
+        words = sorted(ocr.words(ink(crop, 2, level)), key=lambda w: w[1])
+        text = " ".join(t for t, _, _ in words)
+        if text and text not in seen:
+            seen.append(text)
+    return " / ".join(seen)
+
+
 # --- putting it together ----------------------------------------------------
 
 def seat_rows(frame, side, top_agents, known_agents=None):
@@ -860,6 +881,9 @@ class ScreenReader:
         self.banner = BuyBanner()
         self._stop = threading.Event()
         self._thread = None
+        self.spectate, self.spectate_status = False, "off"
+        self._spectate_stop = threading.Event()
+        self._spectate_thread = None
         self.ocr = None
         self.available, self.reason = self._check()
 
@@ -877,6 +901,7 @@ class ScreenReader:
 
     def info(self):
         return {"available": self.available, "enabled": self.enabled, "status": self.status if self.available else self.reason,
+                "spectate": self.spectate, "spectate_status": self.spectate_status if self.available else self.reason,
                 "age": round(time.time() - self.read_at, 1) if self.read_at else None}
 
     def set_enabled(self, on):
@@ -893,6 +918,52 @@ class ScreenReader:
 
     def stop(self):
         self._stop.set()
+        self._spectate_stop.set()
+
+    SPECTATE_EVERY = 0.25
+
+    def set_spectate(self, on):
+        """Observer client: track who's being spectated (sent with send())."""
+        if on and not self.available:
+            raise ValueError(self.reason)
+        self.spectate = bool(on)
+        if self.spectate and not (self._spectate_thread and self._spectate_thread.is_alive()):
+            self._spectate_stop.clear()
+            self._spectate_thread = threading.Thread(target=self._run_spectate, daemon=True)
+            self._spectate_thread.start()
+            log("Scanning for the spectated player")
+        elif not self.spectate:
+            self._spectate_stop.set()
+            self.spectate_status = "off"
+            try:
+                self.send({"source": "observer", "spectating": {"text": ""}})
+            except Exception:
+                pass
+
+    def _run_spectate(self):
+        last, sent_at, last_reason = None, 0.0, None
+        while not self._spectate_stop.is_set():
+            reason = None
+            try:
+                image, reason = capture_valorant()
+                if image is not None:
+                    text = spectated_text(Frame(image), self.ocr)
+                    if text != last or time.time() - sent_at > 1:
+                        reply = self.send({"source": "observer", "spectating": {"text": text}}) or {}
+                        last, sent_at = text, time.time()
+                        who = reply.get("observed") if isinstance(reply, dict) else None
+                        self.spectate_status = (f"Spectating {who}" if who else
+                                                "Not spectating anyone (free cam)" if not text else
+                                                f"Read \"{text}\": no player by that name on the HUD")
+            except Exception as e:
+                reason = f"Couldn't send to the GFX PC: {e}" if isinstance(e, OSError) else f"Scan failed: {e!r}"
+            if reason:
+                self.spectate_status = reason
+            if reason != last_reason:
+                if reason:
+                    log(reason, "warn")
+                last_reason = reason
+            self._spectate_stop.wait(self.SPECTATE_EVERY)
 
     def save_frame(self, folder):
         """Capture the screen as the reader sees it and save it with what was

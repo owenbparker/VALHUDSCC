@@ -28,10 +28,13 @@
   .status.bad { color: #ffcf66; }
   .row { display: flex; gap: 10px; }
   .row > :first-child { flex: 1; }
-  #show { width: 100%; padding: 14px; font: 700 16px "Inter", system-ui, sans-serif; border-radius: 8px; cursor: pointer;
+  #show, #spectate, #connect { width: 100%; padding: 14px; font: 700 16px "Inter", system-ui, sans-serif; border-radius: 8px; cursor: pointer;
           background: #252a2f; color: var(--text); border: 1px solid var(--line); transition: background .15s, color .15s; }
-  #show:hover { border-color: var(--muted); }
-  #show.on { background: var(--accent); color: #06231a; border-color: var(--accent); }
+  .row > #spectate { flex: 1; }
+  #connect { width: auto; padding: 0 16px; font-size: 14px; border-radius: 6px; }
+  #show:hover, #spectate:hover, #connect:hover { border-color: var(--muted); }
+  #show[disabled], #spectate[disabled] { opacity: .5; cursor: default; }
+  #show.on, #spectate.on { background: var(--accent); color: #06231a; border-color: var(--accent); }
   #screen { width: auto; }
   .note { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
   .update { padding: 6px 12px; background: var(--accent); color: #06231a; border: 0; border-radius: 6px; font: 700 13px "Inter", system-ui, sans-serif; cursor: pointer; }
@@ -55,14 +58,19 @@
 <main>
   <section>
     <label for="url">GFX PC address</label>
-    <input id="url" spellcheck="false" placeholder="http://192.168.2.40:8778/overlay">
+    <div class="row">
+      <input id="url" spellcheck="false" placeholder="http://192.168.2.40:8778/overlay">
+      <button id="connect" style="flex:0 0 auto">Connect to HUD</button>
+    </div>
     <div class="status" id="status"></div>
     <div class="row">
       <button id="show">Show HUD on game</button>
+      <button id="spectate" title="Watches who you're spectating in VALORANT and highlights them on the HUD">Scan Additional Info</button>
       <select id="screen" title="Which screen the HUD covers" hidden></select>
     </div>
     <label class="toggle" style="display:flex;gap:8px;align-items:center;margin-top:16px;font-size:13px"><input type="checkbox" id="reader" style="width:auto"> Read VALORANT on this PC and send it to the GFX PC</label>
     <p class="note" id="reader-status" style="margin-top:4px"></p>
+    <p class="note" id="spectate-status" style="margin-top:4px"></p>
     <p class="note" id="note"></p>
   </section>
 </main>
@@ -87,6 +95,11 @@ function apply(s) {
   $("reader").checked = rd.enabled;
   $("reader").disabled = !rd.available;
   $("reader-status").textContent = !rd.available ? rd.status : rd.enabled ? rd.status : "";
+  $("spectate").disabled = !rd.available;
+  $("spectate").classList.toggle("on", !!rd.spectate);
+  $("spectate").textContent = rd.spectate ? "Scanning additional info: on" : "Scan Additional Info";
+  $("spectate-status").textContent = !rd.available ? "" : rd.spectate
+    ? rd.spectate_status : "Scan Additional Info highlights the player you're spectating on the HUD.";
   const ow = s.app.overlay_window;
   $("show").disabled = !ow.available;
   $("show").classList.toggle("on", !!ow.open);
@@ -121,6 +134,11 @@ async function check() {
 }
 
 $("reader").onchange = e => post("/api/reader", { enabled: e.target.checked });
+$("connect").onclick = () => { post("/api/config", { observer_url: $("url").value.trim() }); check(); };
+$("spectate").onclick = () => {
+  if (!state.app.reader.spectate && !$("url").value.trim()) return alert("Enter the GFX PC address and connect to the HUD first.");
+  post("/api/reader/spectate", { enabled: !state.app.reader.spectate });
+};
 $("url").addEventListener("input", () => { clearTimeout(checkTimer); checkTimer = setTimeout(check, 600); });
 $("url").addEventListener("change", () => post("/api/config", { observer_url: $("url").value.trim() }));
 $("show").onclick = () => {

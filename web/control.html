@@ -168,6 +168,18 @@
     <label class="toggle" style="margin-top:12px"><input type="checkbox" id="show-timeouts"> Timeout diamonds under the score</label>
   </section>
 
+  <section>
+    <h2>HUD colours</h2>
+    <p class="note" style="margin-top:0">The HUD's two side colours. They still swap at half time, with the sides.</p>
+    <div class="row">
+      <div><label>Defenders (teal)</label>
+        <div class="row"><input type="color" class="swatch" id="defense-color"><input id="defense-hex" maxlength="7" spellcheck="false"></div></div>
+      <div><label>Attackers (red)</label>
+        <div class="row"><input type="color" class="swatch" id="attack-color"><input id="attack-hex" maxlength="7" spellcheck="false"></div></div>
+    </div>
+    <button id="colors-reset" style="margin-top:10px">Back to teal &amp; red</button>
+  </section>
+
   <section class="wide">
     <h2>Players</h2>
     <p class="note" style="margin:0 0 8px">Names typed here replace the ones from the game. Leave blank to use the game's.</p>
@@ -410,8 +422,27 @@ for (const side of ["left", "right"]) {
     });
 }
 
+// HUD colours: sent when the picker closes (each change reloads the HUD).
+const COLOR_DEFAULTS = { defense: "#00ffcc", attack: "#ff4e5d" };
+for (const k of ["defense", "attack"]) {
+  $(`${k}-color`).addEventListener("input", e => { $(`${k}-hex`).value = e.target.value; });
+  $(`${k}-color`).addEventListener("change", e => post("/api/config", { [`${k}_color`]: e.target.value }));
+  $(`${k}-hex`).addEventListener("change", e => {
+    let v = e.target.value.trim();
+    if (!v.startsWith("#")) v = "#" + v;
+    if (/^#[0-9a-f]{6}$/i.test(v)) post("/api/config", { [`${k}_color`]: v.toLowerCase() });
+    else e.target.value = state.config[`${k}_color`];
+  });
+}
+$("colors-reset").onclick = () => post("/api/config", { defense_color: COLOR_DEFAULTS.defense, attack_color: COLOR_DEFAULTS.attack });
+
 function apply(s) {
   applySponsors(s.config);
+  for (const k of ["defense", "attack"]) {
+    const c = s.config[`${k}_color`] || COLOR_DEFAULTS[k];
+    setIfIdle($(`${k}-color`), c);
+    setIfIdle($(`${k}-hex`), c);
+  }
   const first = !state;
   state = s;
   const cfg = s.config, g = s.game, m = g.match, app = s.app;
