@@ -268,7 +268,10 @@ def attacking_side(frame):
 # for the attacking team, each round's win marked by an icon in the
 # winner's row (skull = elimination, pliers = defuse, ...).
 HISTORY_X = (648, 1330)
-HISTORY_ROWS = {"def": (512, 540), "atk": (540, 568)}
+# Top row: the team in the top block (the left team); bottom: the right
+# team. They stay with their teams when the sides swap (only the DEF/ATK
+# labels and colours change).
+HISTORY_ROWS = {"left": (512, 540), "right": (540, 568)}
 WIN_TYPES = ("Elimination", "Deactivation", "Detonation", "Time")
 _win_icons = []
 
@@ -313,15 +316,12 @@ def win_type(mask):
     return best[0]
 
 
-def round_history(frame, attackers):
+def round_history(frame):
     """[{"winner": "left"/"right", "win_type": ...}] for every round played,
-    from the Tab scoreboard (None if the attacking side isn't known). Icons
-    are taken left to right across both rows, one per round, so the
-    half-time divider and spacing don't matter."""
+    from the Tab scoreboard. Icons are taken left to right across both
+    rows, one per round, so the half-time divider and spacing don't matter."""
     np = _np()
-    if attackers not in ("left", "right"):
-        return None
-    team = {"def": "right" if attackers == "left" else "left", "atk": attackers}
+    team = {"left": "left", "right": "right"}
     icons = []
     for row, (y0, y1) in HISTORY_ROWS.items():
         strip = frame.crop(HISTORY_X[0], y0, HISTORY_X[1], y1)
@@ -354,13 +354,14 @@ def buy_phase(frame):
 
 
 def scoreboard_open(frame):
-    """Is the Tab scoreboard on screen? (teal rows above red rows)"""
-    def share(y0, test):
+    """Is the Tab scoreboard on screen? Two blocks of five coloured rows:
+    usually teal above red, but both teal (or both red) at times, e.g. at
+    half time."""
+    def coloured(y0):
         data = _pixels(frame.crop(820, y0, 930, y0 + 5 * ROW_H))
-        return sum(1 for p in data if test(p)) / max(1, len(data))
-    teal = share(ROW_TOP["left"], lambda p: p[1] > p[0] + 25 and p[1] > 60)
-    red = share(ROW_TOP["right"], lambda p: p[0] > p[1] + 25 and p[0] > 60)
-    return teal > 0.6 and red > 0.6
+        hit = sum(1 for p in data if (p[1] > p[0] + 25 and p[1] > 60) or (p[0] > p[1] + 25 and p[0] > 60))
+        return hit / max(1, len(data))
+    return coloured(ROW_TOP["left"]) > 0.6 and coloured(ROW_TOP["right"]) > 0.6
 
 
 def row_cell(frame, side, row, col, pad=0):
@@ -768,7 +769,7 @@ def read_frame(image, ocr=None, known_agents=None):
                     if info.get(key) is not None:
                         p[field] = info[key]
         update["match"]["scoreboard_open"] = True
-        history = round_history(frame, update["match"].get("attackers"))
+        history = round_history(frame)
         if history:
             update["match"]["rounds"] = history
     return update

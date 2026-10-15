@@ -166,7 +166,7 @@ class ReaderTests(unittest.TestCase):
         frame = Image.new("RGB", (1920, 1080))
         frame.paste(Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "round_history.png")).convert("RGB"),
                     (514, 442))
-        rounds = round_history(Frame(frame), "right")   # left team defending
+        rounds = round_history(Frame(frame))
         self.assertEqual("".join(r["winner"][0] for r in rounds), "rrlllllrlrl")
         self.assertEqual([r["win_type"] for r in rounds[:5]],
                          ["Elimination", "Elimination", "Deactivation", "Deactivation", "Elimination"])
