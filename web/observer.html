@@ -36,6 +36,12 @@
   #show[disabled], #spectate[disabled] { opacity: .5; cursor: default; }
   #show.on, #spectate.on { background: var(--accent); color: #06231a; border-color: var(--accent); }
   #screen { width: auto; }
+  #connect[disabled] { opacity: .6; cursor: progress; }
+  .found { display: grid; gap: 6px; margin-top: 10px; }
+  .found button { text-align: left; padding: 10px 12px; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+                  border-radius: 6px; font: inherit; cursor: pointer; }
+  .found button:hover { border-color: var(--accent); }
+  .found button small { color: var(--muted); margin-left: 8px; }
   .note { color: var(--muted); font-size: 12px; margin: 14px 0 0; }
   .update { padding: 6px 12px; background: var(--accent); color: #06231a; border: 0; border-radius: 6px; font: 700 13px "Inter", system-ui, sans-serif; cursor: pointer; }
   .update:hover { filter: brightness(1.1); }
@@ -62,15 +68,14 @@
       <input id="url" spellcheck="false" placeholder="http://192.168.2.40:8778/overlay">
       <button id="connect" style="flex:0 0 auto">Connect to HUD</button>
     </div>
+    <div class="found" id="found" hidden></div>
     <div class="status" id="status"></div>
     <div class="row">
       <button id="show">Show HUD on game</button>
       <button id="spectate" title="Watches who you're spectating in VALORANT and highlights them on the HUD">Scan Additional Info</button>
       <select id="screen" title="Which screen the HUD covers" hidden></select>
     </div>
-    <label class="toggle" style="display:flex;gap:8px;align-items:center;margin-top:16px;font-size:13px"><input type="checkbox" id="reader" style="width:auto"> Read VALORANT on this PC and send it to the GFX PC</label>
-    <p class="note" id="reader-status" style="margin-top:4px"></p>
-    <p class="note" id="spectate-status" style="margin-top:4px"></p>
+    <p class="note" id="spectate-status" style="margin-top:16px"></p>
     <p class="note" id="note"></p>
   </section>
 </main>
@@ -92,9 +97,8 @@ function apply(s) {
   showUpdate(s.app.update);
   if (first || document.activeElement !== $("url")) $("url").value = s.config.observer_url || "";
   const rd = s.app.reader;
-  $("reader").checked = rd.enabled;
-  $("reader").disabled = !rd.available;
-  $("reader-status").textContent = !rd.available ? rd.status : rd.enabled ? rd.status : "";
+  // The match is read on the GFX PC: an observer PC never reads it (only who it's spectating).
+  if (first && rd.enabled) fetch("/api/reader", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"enabled":false}' }).catch(() => {});
   $("spectate").disabled = !rd.available;
   $("spectate").classList.toggle("on", !!rd.spectate);
   $("spectate").textContent = rd.spectate ? "Scanning additional info: on" : "Scan Additional Info";
@@ -112,7 +116,7 @@ function apply(s) {
   $("screen").hidden = (ow.screens || []).length < 2;
   if (document.activeElement !== $("screen")) $("screen").value = String(ow.screen || 0);
   if (first) {
-    check();
+    if ($("url").value.trim()) check(); else findHud();
     if (s.app.role !== "observer") fetch("/api/role", { method: "POST", headers: { "Content-Type": "application/json" }, body: '{"role":"observer"}' }).catch(() => {});
   }
 }
@@ -133,8 +137,47 @@ async function check() {
   }
 }
 
-$("reader").onchange = e => post("/api/reader", { enabled: e.target.checked });
-$("connect").onclick = () => { post("/api/config", { observer_url: $("url").value.trim() }); check(); };
+function useHud(url) {
+  $("url").value = url;
+  $("found").hidden = true;
+  post("/api/config", { observer_url: url });
+  check();
+}
+
+// Connect to HUD: look on the network for a PC running the HUD; if there's
+// none, ask for its address.
+async function findHud() {
+  const button = $("connect");
+  button.disabled = true;
+  button.textContent = "Searching…";
+  $("found").hidden = true;
+  $("status").className = "status";
+  $("status").textContent = "Looking for the HUD on the network…";
+  let huds = [];
+  try { huds = (await (await fetch("/api/observer/find")).json()).huds || []; } catch (e) {}
+  button.disabled = false;
+  button.textContent = "Connect to HUD";
+  if (huds.length === 1) return useHud(huds[0].overlay);
+  if (huds.length > 1) {
+    $("status").textContent = "More than one PC is running the HUD. Pick the GFX PC:";
+    $("found").innerHTML = "";
+    for (const h of huds) {
+      const b = document.createElement("button");
+      b.innerHTML = `${h.ip}<small>${h.teams || ""}</small>`;
+      b.onclick = () => useHud(h.overlay);
+      $("found").appendChild(b);
+    }
+    $("found").hidden = false;
+    return;
+  }
+  const typed = prompt("No PC running the HUD was found on the network.\n\n" +
+    "Enter the GFX PC's address (shown on the GFX PC under Outputs > From another PC). " +
+    "On the GFX PC, \"Let other PCs on the network read the HUD\" must be ticked.", $("url").value.trim() || "http://");
+  if (typed && typed.trim() && typed.trim() !== "http://") useHud(typed.trim());
+  else check();
+}
+
+$("connect").onclick = findHud;
 $("spectate").onclick = () => {
   if (!state.app.reader.spectate && !$("url").value.trim()) return alert("Enter the GFX PC address and connect to the HUD first.");
   post("/api/reader/spectate", { enabled: !state.app.reader.spectate });

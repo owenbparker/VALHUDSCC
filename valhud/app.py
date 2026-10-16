@@ -375,6 +375,22 @@ def check_gfx(text):
     return {"ok": True, "overlay": base + "/overlay"}
 
 
+def find_gfx(port):
+    """The GFX PCs on this network with the HUD running (and letting other
+    PCs read it): [{"ip", "overlay", "teams"}]."""
+    from .discover import find_huds
+
+    def is_gfx(state):
+        return "game" in state and (state.get("app") or {}).get("role") != "observer"
+    out = []
+    for hit in find_huds(port, is_gfx):
+        cfg = hit["state"].get("config") or {}
+        teams = " vs ".join(t for t in ((cfg.get("left") or {}).get("name"), (cfg.get("right") or {}).get("name")) if t)
+        out.append({"ip": hit["ip"], "overlay": hit["url"] + "/overlay", "teams": teams})
+    log(f"Looked for the HUD on the network: {len(out)} found" + "".join(f", {h['ip']}" for h in out))
+    return out
+
+
 def lan_ip():
     """This PC's address on the local network (no traffic is sent)."""
     try:
@@ -459,6 +475,11 @@ def make_handler(app):
                 if not _is_local(self.client_address[0]):
                     return self._send('{"error":"forbidden"}', status=403)
                 self._send(json.dumps(check_gfx((parse_qs(url.query).get("url") or [""])[0])))
+            elif path == "/api/observer/find":
+                # Observer client: the GFX PCs running the HUD on this network.
+                if not _is_local(self.client_address[0]):
+                    return self._send('{"error":"forbidden"}', status=403)
+                self._send(json.dumps({"huds": find_gfx(app.config.get()["http_port"])}))
             elif path in ("/overlay", "/scoreboard", "/hud", "/hud/", "/scoreboard/"):
                 # The overlays are the templates in web/hud and web/scoreboard
                 # (their images load relative to their own folder).
