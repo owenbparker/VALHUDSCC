@@ -170,6 +170,18 @@ def observed_player(state, text):
     return {"team": best["team"], "slot": best["slot"]}
 
 
+def observed_by_agent(state, agent, side=None):
+    """{"team", "slot"} of the player on that agent ("attackers" /
+    "defenders" says which team when both have one), or None."""
+    agent = agent_name(agent) if agent else ""
+    if not agent:
+        return None
+    attackers = state["match"].get("attackers") or "left"
+    team = {"attackers": attackers, "defenders": "right" if attackers == "left" else "left"}.get(side)
+    found = [p for p in state["players"] if p.get("agent") == agent and (team is None or p["team"] == team)]
+    return {"team": found[0]["team"], "slot": found[0]["slot"]} if len(found) == 1 else None
+
+
 def fields(state, cfg):
     """Flat name -> value fields for vMix / GT Title Designer (CSV, JSON, XML)."""
     m = state["match"]

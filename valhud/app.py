@@ -57,8 +57,9 @@ class HudApp:
         self._stop = threading.Event()
         self._was_connected = None
         self._last_round = None
-        # The observer client's reading of who it's spectating: (text, time).
-        self.spectating = ("", 0.0)
+        # The observer client's reading of who it's spectating:
+        # (text, time, agent, "attackers"/"defenders" or None).
+        self.spectating = ("", 0.0, None, None)
         self.cams = CamHub()   # player webcams (SCC Player Cam, VALORANT mode)
         self.agent_select = AgentSelect()
         self._select_demo = None
@@ -159,7 +160,8 @@ class HudApp:
                 return {"ok": True}
         if isinstance(update, dict) and isinstance(update.get("spectating"), dict):
             update = dict(update)
-            self.spectating = (str(update.pop("spectating").get("text") or ""), time.time())
+            sp = update.pop("spectating")
+            self.spectating = (str(sp.get("text") or ""), time.time(), sp.get("agent"), sp.get("side"))
             if not update.get("match") and not update.get("players"):
                 self.refresh(fetch=False)
                 return self.observed_name()
@@ -181,9 +183,17 @@ class HudApp:
         cfg = self.config.get()
         raw = self.source.fetch() if fetch else self.source.state
         state = game.with_overrides(raw, cfg)
-        text, at = self.spectating
+        # Names not typed or scanned: the ones read in agent select, by agent.
+        picks = self.agent_select.view([])["players"]
+        for p in state["players"]:
+            if not p.get("name") and p.get("agent"):
+                match = [q["name"] for q in picks.get(p["team"], []) if q.get("agent") == p["agent"] and q.get("name")]
+                if len(match) == 1:
+                    p["name"] = match[0]
+        text, at, agent, side = self.spectating
         if time.time() - at < self.SPECTATING_FOR:
-            state["match"]["observed"] = game.observed_player(state, text)
+            state["match"]["observed"] = (game.observed_player(state, text)
+                                          or game.observed_by_agent(state, agent, side))
         fields = game.fields(state, cfg)
         with self._lock:
             self.state, self.fields = state, fields

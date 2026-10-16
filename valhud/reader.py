@@ -659,23 +659,68 @@ def read_scoreboard(frame, ocr):
 
 # --- who the observer is spectating -----------------------------------------
 
-# Spectating a player, the game shows their name ("100T bang") at the bottom,
-# by their health. The whole stretch is read; the GFX PC matches the text to
-# its players' names (see game.observed_player). Free-cam shows no name.
+# Spectating a player, the game shows their name: in tournament spectating
+# at the bottom, by their health ("100T bang"); in a custom game's observer
+# view in a card at the bottom left, by their portrait ("Gora46"). Both
+# stretches are read; the GFX PC matches the text to its players' names (see
+# game.observed_player). Free-cam shows no name.
 SPECTATED_TEXT = (440, 940, 1000, 1004)
+SPECTATED_CARD = (112, 812, 480, 860)
 
 
 def spectated_text(frame, ocr):
-    """The text by the spectated player's health (their name, with the team
-    tag and the health digits around it), or ""."""
-    crop = frame.crop(*SPECTATED_TEXT)
+    """The text where the spectated player's name shows (the name, with any
+    team tag and health digits around it), or ""."""
     seen = []
-    for level in (150, 185):
-        words = sorted(ocr.words(ink(crop, 2, level)), key=lambda w: w[1])
-        text = " ".join(t for t, _, _ in words)
-        if text and text not in seen:
-            seen.append(text)
+    for box, levels in ((SPECTATED_CARD, (200, 160)), (SPECTATED_TEXT, (150, 185))):
+        crop = frame.crop(*box)
+        for level in levels:
+            words = sorted(ocr.words(ink(crop, 2, level)), key=lambda w: w[1])
+            text = " ".join(t for t, _, _ in words)
+            if text and text not in seen:
+                seen.append(text)
     return " / ".join(seen)
+
+
+# The custom-game observer view's card also shows the spectated player's
+# agent (their bust portrait, on red for the attackers or teal for the
+# defenders): who it is when their name isn't known to the HUD.
+SPECTATED_PORTRAIT = (30, 795, 111, 876)
+_bust_refs = None
+
+
+def _busts():
+    global _bust_refs
+    if _bust_refs is None:
+        np = _np()
+        from PIL import Image
+        folder = os.path.join(WEB_DIR, "reader_refs", "select", "agents")
+        _bust_refs = {}
+        for name in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+            if name.endswith(".png"):
+                t = np.asarray(Image.open(os.path.join(folder, name)).convert("RGBA").resize((80, 80), Image.BILINEAR),
+                               dtype=np.float32)
+                _bust_refs[name[:-4]] = (t[..., :3], t[..., 3] > 230)
+    return _bust_refs
+
+
+def spectated_agent(frame):
+    """(agent, "attackers" / "defenders") from the spectated player's card,
+    or (None, None) (no card: free cam, or another kind of spectating)."""
+    np = _np()
+    card = np.asarray(frame.crop(*SPECTATED_PORTRAIT), dtype=np.float32)
+    r, g, b = card[2:8, 2:8].reshape(-1, 3).mean(axis=0)   # the card's own colour, top left
+    side = "attackers" if r > 150 and r - g > 60 else "defenders" if g > 120 and g - r > 40 else None
+    if not side:
+        return None, None
+    best, second = (0.0, None), 0.0
+    for agent, (rgb, mask) in _busts().items():
+        score = max(_ncc(card[oy:oy + 80, ox:ox + 80][mask].ravel(), rgb[mask].ravel()) for ox in (0, 1) for oy in (0, 1))
+        if score > best[0]:
+            best, second = (score, agent), best[0]
+        elif score > second:
+            second = score
+    return (best[1], side) if best[0] >= 0.6 and best[0] - second >= 0.1 else (None, None)
 
 
 # --- putting it together ----------------------------------------------------
@@ -958,14 +1003,17 @@ class ScreenReader:
                 elif self.select.active:
                     image = None
                 if image is not None:
-                    text = spectated_text(Frame(image), self.ocr)
-                    if text != last or time.time() - sent_at > 1:
-                        reply = self.send({"source": "observer", "spectating": {"text": text}}) or {}
-                        last, sent_at = text, time.time()
+                    frame = Frame(image)
+                    text = spectated_text(frame, self.ocr)
+                    agent, side = spectated_agent(frame)
+                    reading = {"text": text, "agent": agent, "side": side}
+                    if reading != last or time.time() - sent_at > 1:
+                        reply = self.send({"source": "observer", "spectating": reading}) or {}
+                        last, sent_at = reading, time.time()
                         who = reply.get("observed") if isinstance(reply, dict) else None
                         self.spectate_status = (f"Spectating {who}" if who else
-                                                "Not spectating anyone (free cam)" if not text else
-                                                f"Read \"{text}\": no player by that name on the HUD")
+                                                "Not spectating anyone (free cam)" if not text and not agent else
+                                                f"Read \"{text or agent}\": no player by that name or agent on the HUD")
             except Exception as e:
                 reason = f"Couldn't send to the GFX PC: {e}" if isinstance(e, OSError) else f"Scan failed: {e!r}"
             if reason:
@@ -1120,10 +1168,13 @@ class SelectTracker:
     been seen twice running (so one misread doesn't flicker), and says when
     agent select is over."""
 
+    HOLD = 120.0   # longest the loading screen keeps agent select up
+
     def __init__(self, send):
         self.send = send
         self.active = False
         self.checked_at = 0.0
+        self.seen_at = 0.0
         self._names = {}
         self._steady = {}
         self._pending = {}
@@ -1136,11 +1187,20 @@ class SelectTracker:
             self.checked_at = time.time()
             reading = selectreader.read(image, ocr, self._names)
             if reading is None:
-                if self.active:
+                if not self.active:
+                    return False
+                # Agent select stays up through the loading screen, until the
+                # match's top bar shows (or it's been too long).
+                in_game = attacking_side(Frame(image)) is not None
+                if in_game or time.time() - self.seen_at > self.HOLD:
                     self.active = False
                     self._names, self._steady, self._pending = {}, {}, {}
                     self.send({"source": "screen", "agent_select": {"active": False}})
-                return False
+                    log("Agent select over: the match is on")
+                    return False
+                self.send({"source": "screen", "agent_select": {"active": True}})   # (still up)
+                return True
+            self.seen_at = time.time()
             if not self.active:
                 log("Agent select on screen" + (f" ({reading['map']})" if reading.get("map") else ""))
             self.active = True

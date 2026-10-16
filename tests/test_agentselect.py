@@ -173,3 +173,71 @@ class ScreenTests(unittest.TestCase):
         from valhud.reader import Frame
         self.assertFalse(t.check(Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "tab_scoreboard.png")), None))
         self.assertEqual(sent[-1]["agent_select"], {"active": False})
+
+
+class LoadingScreenTests(unittest.TestCase):
+    def test_held_through_loading_until_the_match(self):
+        from PIL import Image
+        from valhud.reader import SelectTracker
+        sent = []
+        t = SelectTracker(sent.append)
+        img = lambda *p: Image.open(os.path.join(os.path.dirname(__file__), "fixtures", *p))
+        t.check(img("agent_select", "locked_00.webp"), None)
+        self.assertTrue(t.check(img("agent_select", "loading.webp"), None))    # loading: still up
+        self.assertTrue(t.active)
+        self.assertEqual(sent[-1]["agent_select"], {"active": True})
+        self.assertFalse(t.check(img("spectate", "card_gora46_cypher.webp"), None))   # in the match: over
+        self.assertEqual(sent[-1]["agent_select"], {"active": False})
+
+
+class SpectatedCardTests(unittest.TestCase):
+    def test_agent_and_side_from_the_card(self):
+        from PIL import Image
+        from valhud.reader import Frame, spectated_agent
+        img = lambda n: Frame(Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "spectate", n)))
+        self.assertEqual(spectated_agent(img("card_gora46_cypher.webp")), ("Cypher", "attackers"))
+        self.assertEqual(spectated_agent(img("card_nexusgames3_clove.webp")), ("Clove", "attackers"))
+        # No card (the agent select screen, a tournament spectating frame).
+        self.assertEqual(spectated_agent(Frame(Image.open(os.path.join(FIXTURES, "locked_00.webp")))), (None, None))
+
+    def test_observed_by_agent(self):
+        from valhud import game
+        state = game.empty_state()
+        state["match"]["attackers"] = "right"
+        state = game.merge(state, {"players": [{"team": "right", "slot": 3, "agent": "Cypher"},
+                                               {"team": "left", "slot": 2, "agent": "Cypher"},
+                                               {"team": "left", "slot": 4, "agent": "Clove"}]})
+        self.assertEqual(game.observed_by_agent(state, "Cypher", "attackers"), {"team": "right", "slot": 3})
+        self.assertEqual(game.observed_by_agent(state, "Cypher", "defenders"), {"team": "left", "slot": 2})
+        self.assertEqual(game.observed_by_agent(state, "Clove", None), {"team": "left", "slot": 4})
+        self.assertIsNone(game.observed_by_agent(state, "Cypher", None))   # both teams: can't tell
+
+    def test_spectating_by_agent_reaches_the_hud(self):
+        from valhud.app import HudApp
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Config(os.path.join(tmp, "config.json"))
+            cfg.update({"output_dir": os.path.join(tmp, "out")})
+            app = HudApp(cfg)
+            app.ingest({"source": "test", "match": {"attackers": "right"},
+                        "players": [{"team": "right", "slot": 5, "agent": "Cypher"}]})
+            reply = app.ingest({"source": "observer", "spectating": {"text": "", "agent": "Cypher", "side": "attackers"}})
+            self.assertEqual(app.state["match"]["observed"], {"team": "right", "slot": 5})
+            self.assertIn("observed", reply)
+
+
+class NamesFromAgentSelectTests(unittest.TestCase):
+    def test_unnamed_seats_take_agent_select_names(self):
+        from valhud.app import HudApp
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Config(os.path.join(tmp, "config.json"))
+            cfg.update({"output_dir": os.path.join(tmp, "out"), "attack_first": "left",
+                        "player_names": {"left": ["", "", "", "", ""], "right": ["Typed", "", "", "", ""]}})
+            app = HudApp(cfg)
+            app.agent_select_update({"active": True, "players": [
+                {"team": "left", "slot": 1, "agent": "Cypher", "locked": True, "name": "Gora46"},
+                {"team": "right", "slot": 2, "agent": "Jett", "locked": True, "name": "ReadName"}]}, "screen")
+            app.ingest({"source": "test", "players": [{"team": "left", "slot": 4, "agent": "Cypher"},
+                                                      {"team": "right", "slot": 1, "agent": "Jett"}]})
+            by = {(p["team"], p["slot"]): p["name"] for p in app.state["players"]}
+            self.assertEqual(by[("left", 4)], "Gora46")      # its seat in the match, by agent
+            self.assertEqual(by[("right", 1)], "Typed")      # a typed name wins
