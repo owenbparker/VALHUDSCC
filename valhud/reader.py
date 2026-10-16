@@ -969,6 +969,7 @@ class ScreenReader:
         self._spectate_stop.set()
 
     SPECTATE_EVERY = 0.25
+    SPECTATE_FAST = 0.1   # with the observer card: its portrait is quick to check
 
     def set_spectate(self, on):
         """Observer client: track who's being spectated (sent with send())."""
@@ -990,6 +991,7 @@ class ScreenReader:
 
     def _run_spectate(self):
         last, sent_at, last_reason = None, 0.0, None
+        text, text_at, wait = "", 0.0, self.SPECTATE_EVERY
         while not self._spectate_stop.is_set():
             reason = None
             try:
@@ -1004,8 +1006,20 @@ class ScreenReader:
                     image = None
                 if image is not None:
                     frame = Frame(image)
-                    text = spectated_text(frame, self.ocr)
+                    # The observer card's portrait says who it is in a few
+                    # milliseconds: a cut is sent straight away, and the name
+                    # (slow to read) follows in the next look. Without a card
+                    # (tournament spectating) the name is all there is.
                     agent, side = spectated_agent(frame)
+                    if agent:
+                        wait = self.SPECTATE_FAST
+                        if last and (agent, side) != (last.get("agent"), last.get("side")):
+                            text, text_at = "", 0.0
+                        elif time.time() - text_at > 2:
+                            text, text_at = spectated_text(frame, self.ocr), time.time()
+                    else:
+                        wait = self.SPECTATE_EVERY
+                        text = spectated_text(frame, self.ocr)
                     reading = {"text": text, "agent": agent, "side": side}
                     if reading != last or time.time() - sent_at > 1:
                         reply = self.send({"source": "observer", "spectating": reading}) or {}
@@ -1022,7 +1036,7 @@ class ScreenReader:
                 if reason:
                     log(reason, "warn")
                 last_reason = reason
-            self._spectate_stop.wait(self.SPECTATE_EVERY)
+            self._spectate_stop.wait(wait)
 
     def save_frame(self, folder):
         """Capture the screen as the reader sees it and save it with what was

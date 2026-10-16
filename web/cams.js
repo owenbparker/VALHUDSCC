@@ -1,7 +1,9 @@
 // Player webcams on the HUD: when the observer is spectating a player whose
 // cam is connected (the SCC Player Cam app, VALORANT mode, with their Riot
 // ID), their cam pops up in the template's camera box, bottom left of
-// centre, framed in their side's colour with their name and K / D / A.
+// centre, framed in black with a bar in their side's colour, their name
+// and K / D / A. Switching between players with cams is a straight cut; the
+// box slides in and out when there's a cam to show or not.
 //
 // The cams connect straight to this page over the local network (WebRTC,
 // peer to peer); the app only passes the connection messages along (see
@@ -19,9 +21,9 @@
     "#scc-cam.on { opacity: 1; transform: none; }" +
     "#scc-cam div { position: static; margin: 0; padding: 0; float: none; }" +
     "#scc-cam .scc-frame { position: absolute; inset: 0; background: #1f1e23; overflow: hidden;" +
-    " box-shadow: inset 0 0 0 2px var(--team), 0 0 18px -6px var(--team); transition: box-shadow .4s; }" +
+    " box-shadow: inset 0 0 0 2px #000; }" +
     "#scc-cam video { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 30px);" +
-    " object-fit: cover; opacity: 0; transition: opacity .3s ease; background: #3c3c46; }" +
+    " object-fit: cover; opacity: 0; background: #3c3c46; }" +   // (a straight cut between players)
     "#scc-cam video.on { opacity: 1; }" +
     "#scc-cam .scc-band { position: absolute; left: 2px; right: 2px; bottom: 2px; height: 26px; background: #1f1e23;" +
     " display: flex; align-items: center; color: whitesmoke; font-family: Arabic, sans-serif; font-size: 18px; }" +
@@ -131,7 +133,7 @@
     var show = on && !hide && ready && !!player;
     box.classList.toggle("on", show);
     if (!player) return;
-    // Framed in their side's colour (the sides swap at half time).
+    // The bar by the name is in their side's colour (the sides swap at half time).
     var colour = player.team === m.attackers ? cfg.attack_color : cfg.defense_color;
     box.style.setProperty("--team", colour || "#00ffcc");
     box.querySelector(".scc-name").textContent = player.name || "";
