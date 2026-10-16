@@ -34,7 +34,7 @@ def map_name(text):
 
 def empty():
     return {"active": False, "map": "", "timer": 0, "timer_at": 0.0,
-            "players": {side: [{"agent": "", "locked": False} for _ in range(5)] for side in SIDES}}
+            "players": {side: [{"agent": "", "locked": False, "name": ""} for _ in range(5)] for side in SIDES}}
 
 
 class AgentSelect:
@@ -74,6 +74,8 @@ class AgentSelect:
                     target["agent"] = a if a in AGENTS else ""
                 if "locked" in p:
                     target["locked"] = bool(p["locked"]) and bool(target["agent"])
+                if p.get("name"):
+                    target["name"] = str(p["name"])[:32]   # as read off the screen
             self.source = source or self.source
             self.updated_at = time.time()
         return new_map
@@ -97,7 +99,8 @@ class AgentSelect:
         names = {(p["team"], p["slot"]): p.get("name") or "" for p in players}
         for side in SIDES:
             for i, p in enumerate(s["players"][side]):
-                p["name"] = names.get((side, i + 1), "")
+                # The name read off the agent select screen, else the HUD's.
+                p["name"] = p.get("name") or names.get((side, i + 1), "")
         s["source"] = self.source
         return s
 

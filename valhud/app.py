@@ -79,6 +79,18 @@ class HudApp:
                 log(f"Agent select: the map is {new_map} (map {i + 1} of the series)")
             self.feed.apply({"source": source or "agent select", "match": {"map": new_map}})
 
+    def _select_sides(self, reading):
+        """The agent select screen shows DEFENDERS left and ATTACKERS right:
+        which of our teams those are comes from who attacks first."""
+        attackers = self.config.get().get("attack_first") or "left"
+        side = {"attackers": attackers, "defenders": "right" if attackers == "left" else "left"}
+        players = []
+        for p in reading.get("players") or []:
+            p = dict(p)
+            p["team"] = side.get(p.get("team"), p.get("team"))
+            players.append(p)
+        return dict(reading, players=players) if "players" in reading else reading
+
     def agent_select_demo(self, on):
         if self._select_demo:
             self._select_demo.stop()
@@ -140,7 +152,7 @@ class HudApp:
         """Live data from a feed (screen reader, Overwolf app, another tool)."""
         if isinstance(update, dict) and isinstance(update.get("agent_select"), dict):
             update = dict(update)
-            self.agent_select_update(update.pop("agent_select"), "screen")
+            self.agent_select_update(self._select_sides(update.pop("agent_select")), "screen")
             if not update.get("match") and not update.get("players") and "spectating" not in update:
                 if self.mode == "live":
                     self.refresh()   # (a map read off the screen)

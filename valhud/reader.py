@@ -8,6 +8,8 @@ window a couple of times a second and reads what the spectator view shows:
     planted spike;
   - the Tab scoreboard, whenever it's open (e.g. the buy phase): names, ult
     points, kills / deaths / assists, weapon, shield and credits.
+  - agent select, when that's on screen instead: the map and each player's
+    agent, hovered or locked (see selectreader.py).
 
 Agents and weapons are recognised by comparing against the HUD's own agent
 and weapon images; text is read with Windows' built-in text recognition.
@@ -885,6 +887,7 @@ class ScreenReader:
         self._spectate_stop = threading.Event()
         self._spectate_thread = None
         self.ocr = None
+        self.select = SelectTracker(self.send)   # agent select, when it's on screen
         self.available, self.reason = self._check()
 
     def _check(self):
@@ -946,6 +949,14 @@ class ScreenReader:
             reason = None
             try:
                 image, reason = capture_valorant()
+                # Agent select (read and sent by the tracker, twice a second
+                # while it's up, else checked once a second): nobody to spectate.
+                since = time.time() - self.select.checked_at
+                if image is not None and (since >= 1 or (self.select.active and since >= 0.5)):
+                    if self.select.check(image, self.ocr):
+                        image = None
+                elif self.select.active:
+                    image = None
                 if image is not None:
                     text = spectated_text(Frame(image), self.ocr)
                     if text != last or time.time() - sent_at > 1:
@@ -1077,7 +1088,9 @@ class ScreenReader:
             reason = None
             try:
                 image, reason = capture_valorant()
-                if image is not None:
+                if image is not None and self.select.check(image, self.ocr):
+                    pass   # agent select (sent by the tracker): no match to read
+                elif image is not None:
                     update = read_frame(image, self.ocr, self.agents)
                     self._learn_agents(update)
                     self._steady_score(update)
@@ -1099,6 +1112,46 @@ class ScreenReader:
                 log(reason or "Reading the spectator screen", "warn" if reason else "info")
                 last_reason = reason
             self._stop.wait(0.5)
+
+
+class SelectTracker:
+    """Agent select off the screen (valhud/selectreader.py): sends each
+    reading as {"agent_select": ...}, once a card's new agent or lock has
+    been seen twice running (so one misread doesn't flicker), and says when
+    agent select is over."""
+
+    def __init__(self, send):
+        self.send = send
+        self.active = False
+        self.checked_at = 0.0
+        self._names = {}
+        self._steady = {}
+        self._pending = {}
+        self._lock = threading.Lock()
+
+    def check(self, image, ocr):
+        """Is agent select on screen? (If so, it's read and sent.)"""
+        from . import selectreader
+        with self._lock:
+            self.checked_at = time.time()
+            reading = selectreader.read(image, ocr, self._names)
+            if reading is None:
+                if self.active:
+                    self.active = False
+                    self._names, self._steady, self._pending = {}, {}, {}
+                    self.send({"source": "screen", "agent_select": {"active": False}})
+                return False
+            if not self.active:
+                log("Agent select on screen" + (f" ({reading['map']})" if reading.get("map") else ""))
+            self.active = True
+            for p in reading["players"]:
+                key, value = (p["team"], p["slot"]), (p["agent"], p["locked"])
+                if key not in self._steady or self._pending.get(key) == value:
+                    self._steady[key] = value
+                self._pending[key] = value
+                p["agent"], p["locked"] = self._steady[key]
+            self.send({"source": "screen", "agent_select": reading})
+            return True
 
 
 def _similar(a, b):

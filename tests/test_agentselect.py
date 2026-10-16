@@ -96,3 +96,80 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "agent_select")
+
+
+class ScreenTests(unittest.TestCase):
+    """Real frames of the observer's agent select screen."""
+
+    def read(self, name):
+        from PIL import Image
+        from valhud import selectreader
+        return selectreader.read(Image.open(os.path.join(FIXTURES, name + ".webp")))
+
+    def cards(self, reading):
+        return {(p["team"], p["slot"]): (p["agent"], p["locked"]) for p in reading["players"]}
+
+    def test_everyone_locked(self):
+        r = self.read("locked_00")
+        self.assertTrue(r["active"])
+        self.assertEqual(r["map"], "Ascent")
+        cards = self.cards(r)
+        self.assertEqual([cards[("defenders", i)][0] for i in range(1, 6)], ["Brimstone", "Omen", "Sage", "Chamber", "Deadlock"])
+        self.assertEqual([cards[("attackers", i)][0] for i in range(1, 6)], ["Neon", "Omen", "Gekko", "Raze", "Yoru"])
+        self.assertTrue(all(locked for _, locked in cards.values()))
+
+    def test_hovering_locked_and_empty(self):
+        cards = self.cards(self.read("mixed_38"))
+        self.assertEqual(cards[("defenders", 1)], ("Brimstone", True))
+        self.assertEqual(cards[("defenders", 2)], ("", False))           # nothing picked yet
+        self.assertEqual(cards[("defenders", 5)], ("Deadlock", False))   # hovering
+        self.assertEqual(cards[("attackers", 4)], ("Raze", False))
+        self.assertEqual(cards[("attackers", 5)], ("Yoru", True))
+        # A portrait still fading in while hovering.
+        cards = self.cards(self.read("hover_62"))
+        self.assertEqual(cards[("attackers", 5)], ("Yoru", False))
+        self.assertFalse(any(locked for _, locked in cards.values()))
+        cards = self.cards(self.read("empty_70_taskbar"))
+        self.assertTrue(all(agent == "" for agent, _ in cards.values()))
+
+    def test_not_agent_select(self):
+        from PIL import Image
+        from valhud import selectreader
+        for name in ("tab_scoreboard.png", "round_history.png"):
+            path = os.path.join(os.path.dirname(__file__), "fixtures", name)
+            self.assertIsNone(selectreader.read(Image.open(path)))
+
+    def test_screen_sides_to_teams(self):
+        from valhud.app import HudApp
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Config(os.path.join(tmp, "config.json"))
+            cfg.update({"attack_first": "left", "output_dir": os.path.join(tmp, "out")})
+            app = HudApp(cfg)
+            reading = self.read("mixed_38")
+            reading["players"][0]["name"] = "mimiQ"
+            app.ingest({"source": "observer", "agent_select": reading})
+            v = app.agent_select.view([])
+            # Defenders are the team not attacking first (right, here).
+            self.assertEqual(v["players"]["right"][0], {"agent": "Brimstone", "locked": True, "name": "mimiQ"})
+            self.assertEqual(v["players"]["left"][4]["agent"], "Yoru")
+            self.assertEqual(v["map"], "Ascent")
+
+    def test_tracker_needs_two_reads_to_change(self):
+        from PIL import Image
+        from valhud.reader import SelectTracker
+        sent = []
+        t = SelectTracker(sent.append)
+        frame = lambda n: Image.open(os.path.join(FIXTURES, n + ".webp"))
+        t.check(frame("hover_62"), None)
+        t.check(frame("locked_00"), None)      # one read of the locks: not yet
+        last = {(p["team"], p["slot"]): p for p in sent[-1]["agent_select"]["players"]}
+        self.assertFalse(last[("attackers", 5)]["locked"])
+        t.check(frame("locked_00"), None)      # seen again: now it counts
+        last = {(p["team"], p["slot"]): p for p in sent[-1]["agent_select"]["players"]}
+        self.assertTrue(last[("attackers", 5)]["locked"])
+        from valhud.reader import Frame
+        self.assertFalse(t.check(Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "tab_scoreboard.png")), None))
+        self.assertEqual(sent[-1]["agent_select"], {"active": False})
