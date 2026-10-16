@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import game, outputs, recolor
+from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
 from .demo import DemoGame
@@ -59,6 +60,38 @@ class HudApp:
         # The observer client's reading of who it's spectating: (text, time).
         self.spectating = ("", 0.0)
         self.cams = CamHub()   # player webcams (SCC Player Cam, VALORANT mode)
+        self.agent_select = AgentSelect()
+        self._select_demo = None
+
+    # --- agent select -------------------------------------------------------
+
+    def agent_select_update(self, reading, source=""):
+        """A reading of agent select (screen, demo or control panel). A map
+        read off the screen becomes the map being played."""
+        new_map = self.agent_select.apply(reading, source)
+        if new_map and source != "demo":
+            cfg = self.config.get()
+            maps = [dict(m) for m in cfg.get("maps") or []]
+            i = int(cfg.get("current_map") or 0)
+            if 0 <= i < len(maps) and maps[i].get("name") != new_map:
+                maps[i]["name"] = new_map
+                self.config.update({"maps": maps})
+                log(f"Agent select: the map is {new_map} (map {i + 1} of the series)")
+            self.feed.apply({"source": source or "agent select", "match": {"map": new_map}})
+
+    def agent_select_demo(self, on):
+        if self._select_demo:
+            self._select_demo.stop()
+            self._select_demo = None
+        if on:
+            cfg = self.config.get()
+            maps = cfg.get("maps") or [{}]
+            current = maps[min(int(cfg.get("current_map") or 0), len(maps) - 1)].get("name") or "Ascent"
+            self.agent_select.clear()
+            self._select_demo = AgentSelectDemo(self.agent_select, current).start()
+            log(f"Agent select demo started ({current})")
+        else:
+            self.agent_select.apply({"active": False}, "demo")
 
     def set_mode(self, mode, speed=None):
         """Switch between the live feed ("live") and a simulated match ("demo")."""
@@ -105,6 +138,13 @@ class HudApp:
 
     def ingest(self, update):
         """Live data from a feed (screen reader, Overwolf app, another tool)."""
+        if isinstance(update, dict) and isinstance(update.get("agent_select"), dict):
+            update = dict(update)
+            self.agent_select_update(update.pop("agent_select"), "screen")
+            if not update.get("match") and not update.get("players") and "spectating" not in update:
+                if self.mode == "live":
+                    self.refresh()   # (a map read off the screen)
+                return {"ok": True}
         if isinstance(update, dict) and isinstance(update.get("spectating"), dict):
             update = dict(update)
             self.spectating = (str(update.pop("spectating").get("text") or ""), time.time())
@@ -201,6 +241,9 @@ class HudApp:
             snap = {"game": self.state, "fields": self.fields, "updated_at": self.updated_at,
                     "config": self.config.get(), "output_dir": self.config.output_dir(), "app": self.app_info()}
         snap["cams"] = {"publishers": self.cams.publishers(players)}
+        snap["agent_select"] = self.agent_select.view(players)
+        snap["agent_select"]["demo"] = bool(self._select_demo and self._select_demo.running())
+        snap["agent_select"]["agents"] = game.AGENTS
         return snap
 
     def cam_post(self, path, body):
@@ -401,6 +444,13 @@ def make_handler(app):
                 self.send_response(302)
                 self.send_header("Location", f"/{folder}/Console.html" + (f"?{url.query}" if url.query else ""))
                 self.end_headers()
+            elif path in ("/agent-select", "/agent-select/"):
+                # The chosen look (?look= to see another).
+                look = (parse_qs(url.query).get("look") or [(app.config.get().get("agent_select") or {}).get("look")])[0]
+                page = "/select/Console.html" if look != "champions" else "/agent-select-champions.html"
+                self.send_response(302)
+                self.send_header("Location", page + (f"?{url.query}" if url.query else ""))
+                self.end_headers()
             elif path in ("/control", "/start", "/observer"):
                 self._static(path[1:] + ".html")
             elif path == "/api/state":
@@ -497,6 +547,10 @@ def make_handler(app):
                     app.reader.set_spectate(body.get("enabled"))
                 elif path == "/api/reader":
                     app.set_reader(body.get("enabled"))
+                elif path == "/api/agent-select":
+                    app.agent_select_update(body, "control panel")
+                elif path == "/api/agent-select/demo":
+                    app.agent_select_demo(bool(body.get("on")))
                 elif path == "/api/role":
                     app.set_role(body.get("role"))
                 else:

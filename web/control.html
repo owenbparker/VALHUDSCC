@@ -75,6 +75,10 @@
   .fields div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; cursor: copy; }
   .fields span:last-child { color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
   .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .select-players .pick { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; font-size: 13px; }
+  .select-players .pick span { flex: 0 0 90px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .select-players .pick select { flex: 1; min-width: 0; }
+  .select-players .pick label { display: flex; align-items: center; gap: 4px; margin: 0; flex: 0 0 auto; color: var(--muted); }
   .cam-list { display: grid; gap: 6px; }
   .cam-list .cam { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
   .cam-list .cam .who { margin-left: auto; color: var(--muted); }
@@ -206,6 +210,27 @@
       <span class="note" id="sponsor-note" style="margin:0"></span>
     </div>
     <p class="note">Rotate in the top right of the HUD, in this order. Saving puts them on the HUD now and makes them the rotation every time the app starts. With none, the HUD shows its own two.</p>
+  </section>
+
+  <section class="wide">
+    <h2>Agent select</h2>
+    <div class="out"><span>Agent select overlay (OBS / vMix browser source, 1920×1080): shows itself during agent select</span>
+      <div class="row"><code id="url-select"></code><button data-copy="url-select">Copy</button></div></div>
+    <div class="row" style="align-items:center">
+      <label style="margin:0;flex:0 0 auto">Look</label>
+      <select id="select-look" style="flex:0 0 220px"><option value="pro">PRO Selector</option><option value="champions">Champions 2025</option></select>
+      <span class="note" id="select-status" style="margin:0"></span>
+    </div>
+    <div class="btns" style="margin-top:10px">
+      <button id="select-onair">Show now</button>
+      <button id="select-demo">Play demo</button>
+      <button id="select-clear">Clear</button>
+      <select id="select-map" style="flex:0 0 200px"></select>
+    </div>
+    <div class="players select-players"><div id="select-left"></div><div id="select-right"></div></div>
+    <p class="note">The map and each player's agent come from the observer's agent select screen (or set them here).
+      An agent being hovered shows as a silhouette; it fills in once locked. The map read becomes the current map
+      of the series.</p>
   </section>
 
   <section class="wide">
@@ -454,6 +479,7 @@ $("colors-reset").onclick = () => post("/api/config", { defense_color: COLOR_DEF
 function apply(s) {
   applySponsors(s.config);
   applyCams(s);
+  applySelect(s);
   for (const k of ["defense", "attack"]) {
     const c = s.config[`${k}_color`] || COLOR_DEFAULTS[k];
     setIfIdle($(`${k}-color`), c);
@@ -550,6 +576,51 @@ document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click"
 }));
 document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => post("/api/open", { folder: b.dataset.open })));
 $("cams-on").onchange = e => post("/api/config", { cams: { enabled: e.target.checked } });
+// Agent select: look, demo, and setting the map and agents by hand.
+$("select-look").onchange = e => post("/api/config", { agent_select: { look: e.target.value } });
+$("select-demo").onclick = () => post("/api/agent-select/demo", { on: !(state.agent_select || {}).demo });
+$("select-onair").onclick = () => post("/api/agent-select", { active: !(state.agent_select || {}).active });
+$("select-clear").onclick = () => post("/api/agent-select", { active: (state.agent_select || {}).active, map: "",
+  players: ["left", "right"].flatMap(team => [1, 2, 3, 4, 5].map(slot => ({ team, slot, agent: "", locked: false }))) });
+$("select-map").innerHTML = '<option value="">Map: from the screen</option>' + MAPS.map(m => `<option>${m}</option>`).join("");
+$("select-map").onchange = e => { if (e.target.value) post("/api/agent-select", { map: e.target.value }); };
+function selectPlayer(team, slot) {
+  const row = document.querySelector(`#select-${team} .pick[data-slot="${slot}"]`);
+  post("/api/agent-select", { players: [{ team, slot, agent: row.querySelector("select").value,
+                                          locked: row.querySelector("input").checked }] });
+}
+function applySelect(s) {
+  const a = s.agent_select || {};
+  setIfIdle($("select-look"), (s.config.agent_select || {}).look || "pro");
+  $("url-select").textContent = `http://localhost:${s.app.port}/agent-select`;
+  $("select-demo").textContent = a.demo ? "Stop demo" : "Play demo";
+  $("select-demo").classList.toggle("on", !!a.demo);
+  $("select-onair").textContent = a.active ? "Hide" : "Show now";
+  $("select-onair").classList.toggle("on", !!a.active);
+  $("select-status").textContent = a.active ? `On${a.map ? ": " + a.map : ""}${a.source ? " (from " + a.source + ")" : ""}` : "Off (waiting for agent select)";
+  if (document.activeElement !== $("select-map")) $("select-map").value = "";
+  for (const team of ["left", "right"]) {
+    const box = $(`select-${team}`), players = (a.players || {})[team] || [];
+    if (!box.children.length) {
+      box.innerHTML = `<label>${team === "left" ? "Left" : "Right"} team</label>` + [1, 2, 3, 4, 5].map(slot =>
+        `<div class="pick" data-slot="${slot}"><span></span><select><option value="">—</option>` +
+        (a.agents || []).map(g => `<option value="${g}">${g === "Kayo" ? "KAY/O" : g}</option>`).join("") +
+        `</select><label><input type="checkbox"> locked</label></div>`).join("");
+      box.querySelectorAll(".pick").forEach(row => {
+        const slot = Number(row.dataset.slot);
+        row.querySelector("select").onchange = () => selectPlayer(team, slot);
+        row.querySelector("input").onchange = () => selectPlayer(team, slot);
+      });
+    }
+    box.querySelectorAll(".pick").forEach((row, i) => {
+      const p = players[i] || {};
+      row.querySelector("span").textContent = p.name || `Player ${i + 1}`;
+      setIfIdle(row.querySelector("select"), p.agent || "");
+      const tick = row.querySelector("input");
+      if (document.activeElement !== tick) tick.checked = !!p.locked;
+    });
+  }
+}
 function applyCams(s) {
   $("cams-on").checked = (s.config.cams || {}).enabled !== false;
   const pubs = (s.cams || {}).publishers || [], cfg = s.config;

@@ -1,0 +1,649 @@
+@font-face {
+font-family: afb;
+src: url('Resources/afb.ttf');
+}
+    
+@font-face {
+font-family: impact;
+src: url('Resources/impact.ttf');
+}
+    
+@font-face {
+font-family: Tungsten;
+src: url('Resources/Tungsten-Bold.ttf');
+}
+    
+@font-face {
+font-family: Arabic;
+src: url('Resources/Arabic.ttf');
+}
+
+@font-face {
+font-family: Kalistom;
+src: url('Resources/Kallisto Medium.otf');
+}
+
+@font-face {
+font-family: FGridnik;
+src: url('Resources/FGridnik.otf');
+}
+
+/* Title */
+body > div.Bracket > h1 {
+    position: absolute;
+    font-family: impact;
+    color: white;
+    font-size: 52px;
+    -webkit-text-stroke: 2px black;
+    left: 780px;
+    top: 400px;
+}
+/* Figure 1 */
+
+body > div.Bracket > div.Figure1{
+	background-image: url(Resources/Layer1.png);
+    background-repeat: no-repeat;
+    height: 190px;
+    width: 128px;
+    margin-left: 879px;
+    margin-top: 110px;
+}
+
+
+/* Bracket 8 Players */
+
+body > div.Bracket > div.Figure2{
+	background-repeat: no-repeat;
+    width: 1202px;
+    height: 676px;
+    top: 0px;
+    position: absolute;
+}
+
+
+/* Bracket 8 Players With Loser*/
+
+/* Player Display */
+
+.Match1, .Match2, .Match3, .winner, .winner1, .winner2, .MatchL1, .MatchL2, .MatchL3, .MatchL4{
+	font-family: 'afb';
+    position: absolute;
+    text-align: center;
+}
+
+.Score1, .Score2{
+	font-family: 'Tungsten';
+    position: absolute;
+    text-align: center;
+    display: none;
+}
+
+.Score1{
+	color: whitesmoke;
+    left: 759px;
+    font-size: 53px;
+    top: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    width: 100px;
+    text-align: center;
+}
+
+.Score2{
+	color: whitesmoke;
+    left: 1057px;
+    font-size: 53px;
+    top: 0px;
+    margin-top: 0px;
+    margin-bottom: 0px;
+    width: 100px;
+    text-align: center;
+}
+
+
+.lb{
+	font-size:larger;
+}
+
+/*---------------------------------------------------------*/
+
+body > div.ScoreBoard > div.TeamIzquierda > div.TIP1 {
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 70px;
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamIzquierda > div.TIP2{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 224px;
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamIzquierda > div.TIP3{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+	left: 376px;
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamIzquierda > div.TIP4{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+	left: 531px;
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamIzquierda > div.TIP5{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 686px;
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+.Name {
+    position: absolute;
+    font-size: 18px;
+    width: 96px;
+    text-align: left;
+    top: 276px;
+    left: -9px;
+    color: white;
+    font-family: kalistom;
+	z-index: 2;
+}
+
+@keyframes changeIcon {
+    0% {
+    width: 131px;
+    height: 159px;
+    background-size: 456px 650px;
+    background-repeat: no-repeat;
+    background-position-y: 169px;
+    background-position-x: -166px;
+}
+
+    60% {
+    width: 131px;
+    height: 159px;
+    background-size: 456px 650px;
+    background-repeat: no-repeat;
+    background-position-y: 169px;
+    background-position-x: -166px;
+}
+
+    100% {
+    width: 153px;
+    height: 235px;
+    background-size: 345px 515px;
+    background-repeat: no-repeat;
+    background-position-y: 26px;
+    background-position-x: -108px;
+}
+}
+
+@keyframes changeMap {
+    0% {
+    width: 0px;
+    height: 0px;
+	background-repeat: no-repeat;
+    background-size: cover;
+    background-position-x: center;
+}
+
+    60% {
+    width: 131px;
+    height: 159px;
+	background-repeat: no-repeat;
+    background-size: cover;
+    background-position-x: center;
+}
+
+    100% {
+    width: 200px;
+    height: 200px;
+	background-repeat: no-repeat;
+    background-size: cover;
+    background-position-x: center;
+}
+}
+
+
+
+.Icon.change {
+    animation: changeIcon 5s forwards;
+}
+
+.Skill1 {
+    width: 40px;
+    height: 40px;
+    left: 1px;
+    top: 0px;
+    position: absolute;
+    background-size: 19px 19px;
+    background-repeat: no-repeat;
+    background-position-y: center;
+    background-position-x: center;
+}
+
+.Skill2{
+	width: 33px;
+    height: 52px;
+    left: 115px;
+    position: absolute;
+    background-size: 25px 25px;
+    background-repeat: no-repeat;
+    background-position-y: 10px;
+    display: none !important;
+}
+
+.Skill3{
+	width: 33px;
+    height: 52px;
+    left: 150px;
+    position: absolute;
+    background-size: 25px 25px;
+    background-repeat: no-repeat;
+    background-position-y: 10px;
+    display: none !important;
+}
+
+.Skill4{
+	width: 33px;
+    height: 52px;
+    left: 185px;
+    position: absolute;
+    background-size: 25px 25px;
+    background-repeat: no-repeat;
+    background-position-y: 10px;
+    display: none !important;
+}
+
+.Points{
+	width: 49px;
+    height: 15px;
+    left: 258px;
+    top: 35px;
+    position: absolute;
+    background-size: 12px 12px;
+    background-position-y: 2px;
+    background-position-x: right;
+    background-repeat: no-repeat;
+    background-image: url(Resources/Escudos/CV.png);
+    text-align: end;
+    font-family: arial;
+    color: whitesmoke;
+    display: none;
+}
+
+.PP1{
+	position: absolute;
+    right: 15px;
+    display: none;
+}
+
+.Weapon1{
+	width: 92px;
+    height: 29px;
+    left: 220px;
+    top: 8px;
+    position: absolute;
+    background-repeat: no-repeat;
+    background-position-y: center;
+    background-position-x: right;
+    transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+    display: none;
+}
+
+.Shield{
+	width: 73px;
+    height: 32px;
+    left: 240px;
+    top: 52px;
+    position: absolute;
+    background-size: 25px 25px;
+    background-repeat: no-repeat;
+    background-position-y: center;
+    font-family: arial;
+    font-size: 19px;
+    color: whitesmoke;
+    display: none;
+}
+
+.SP1{
+	position: absolute;
+    left: 29px;
+    top: 5px;
+    width: 38px;
+    text-align: center;
+    display: none;
+}
+
+.HP1{
+	position: absolute;
+    display: none;
+    bottom: -6px;
+    width: 0%;
+    height: 7px;
+    background-color: rgb(0, 255, 202)
+}
+
+/*---------------------------------------------------------*/
+
+body > div.ScoreBoard > div.TeamDerecha > div.TDP1{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 1077px;
+    /*transform: scaleX(-1);*/
+    /*-webkit-transform: scaleX(-1);*/
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamDerecha > div.TDP2{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 1234px;
+    /*transform: scaleX(-1);*/
+    /*-webkit-transform: scaleX(-1);*/
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamDerecha > div.TDP3{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 1389px;
+    /*transform: scaleX(-1);*/
+    /*-webkit-transform: scaleX(-1);*/
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamDerecha > div.TDP4{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 1544px;
+    /*transform: scaleX(-1);*/
+    /*-webkit-transform: scaleX(-1);*/
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+body > div.ScoreBoard > div.TeamDerecha > div.TDP5{
+    position: absolute;
+    width: 153px;
+    height: 308px;
+    top: 737px;
+    left: 1700px;
+    /*transform: scaleX(-1);*/
+    /*-webkit-transform: scaleX(-1);*/
+	box-shadow: 0px -7px 20px #1a1a15;
+}
+
+.Weapon2{
+	width: 92px;
+    height: 29px;
+    left: 220px;
+    top: 8px;
+    position: absolute;
+    background-repeat: no-repeat;
+    background-position-y: center;
+    background-position-x: right;
+    transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+    display: none;
+}
+
+.HP2{
+	position: absolute;
+    display: none;
+    bottom: -6px;
+    width: 0%;
+    height: 7px;
+    background-color: rgb(255, 78, 94);
+}
+
+.Name2 {
+    position: absolute;
+    z-index: 2;
+    font-size: 18px;
+    width: 96px;
+    text-align: right;
+    top: 276px;
+    left: 67px;
+    color: whitesmoke;
+    font-family: 'Kalistom';
+    /*transform: scaleX(-1);*/
+    /*-webkit-transform: scaleX(-1);*/
+}
+
+.SP2{
+	position: absolute;
+    left: 29px;
+    top: 5px;
+    width: 38px;
+    text-align: center;
+	transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+    display: none;
+}
+
+.PP2{
+	position: absolute;
+    right: 15px;
+	transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+    display: none;
+}
+
+.KDA1{
+    display:none;
+}
+
+.KDA2{
+    display:none;
+}
+
+div.sliding {
+    transition: background-position-y 0.5s ease;
+}
+
+h3 {
+    font-family: Calibri, sans-serif;
+    position: absolute;
+    width: 118px;
+    left: 901px;
+    top: -6px;
+    color: rgb(255, 255, 255);
+    font-size: 12px;
+    text-align: center;
+}
+
+.separadores {
+    position: absolute;
+    left: 0px;
+    top:  0px;
+    z-index: 1;
+}
+
+.teams {
+    position: absolute;
+    left: 0px;
+    top:  0px;
+    z-index: 0;
+}
+
+.logo1 {
+    position: absolute;
+    left: 105px;
+    width: 64px;
+    height: 64px;
+    top: 662px;
+}
+
+.logo2 {
+    position: absolute;
+    left: 1735px;
+    width: 64px;
+    height: 64px;
+    top: 662px;
+}
+
+.Team1b {
+    position: absolute;
+    left: 225px;
+    font-family: 'Tungsten';
+    color: white;
+    font-size: 55px;
+    top: 588px;
+    text-align: left;
+    width: 350px;
+}
+    
+.Team2b {
+    position: absolute;
+    left: 1348px;
+    font-family: 'Tungsten';
+    color: white;
+    font-size: 55px;
+    top: 588px;
+    text-align: right;
+    width: 350px;
+}
+
+
+#teamIzquierda > div.TIP1 > div.Skill1.fade-out, #teamIzquierda > div.TIP2 > div.Skill1.fade-out, #teamIzquierda > div.TIP3 > div.Skill1.fade-out, #teamIzquierda > div.TIP4 > div.Skill1.fade-out, #teamIzquierda > div.TIP5 > div.Skill1.fade-out{
+	background-color: #dfb31b;
+}
+
+.TDP1 > div.Icon::before, .TDP2 > div.Icon::before, .TDP3 > div.Icon::before, .TDP4 > div.Icon::before, .TDP5 > div.Icon::before{
+	transform: scaleX(-1);
+    -webkit-transform: scaleX(-1);
+}
+
+.DivisorY{
+	width: 840px;
+    height: 80px;
+    position: absolute;
+    top: 964px;
+    left: 0px;
+    background-color: #dfb31b;
+    z-index: 1;
+}
+
+.DivisorB{
+	width: 840px;
+    height: 80px;
+    position: absolute;
+    top: 964px;
+    left: 1077px;
+    background-color: #000000;
+    z-index: 1;
+}
+
+.Agent{
+position: absolute;
+    font-size: 13px;
+    width: 96px;
+    text-align: left;
+    top: 252px;
+    left: -9px;
+    color: #2b8a88;
+    font-family: kalistom;
+    z-index: 2;
+}
+
+.Agent2 {
+    position: absolute;
+    font-size: 13px;
+    width: 96px;
+    text-align: right;
+    top: 252px;
+    left: 67px;
+    color: #2b8a88;
+    font-family: kalistom;
+    z-index: 2;
+}
+
+.Skill1.SR.fade-out{
+	filter: brightness(0.65) saturate(0%) sepia(68%) hue-rotate(368deg) saturate(500%);
+	left: 112px;
+}
+
+.LogoSponsor{
+    background-image: url(Resources/Logos/Gstack.png);
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+    width: 237px;
+    height: 71px;
+    top: 962px;
+    left: 840px;
+    position: absolute;
+}
+
+.LogoMap{
+	/* background-image: url(Resources/Maps/Bind.png); */
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position-x: center;
+    width: 200px;
+    height: 200px;
+    top: 738px;
+    left: 861px;
+    position: absolute;
+}
+
+.LogoText {
+	font-size: xx-large;
+    color: #2ab9b6;
+    font-family: FGridnik;
+    font-weight: bold;
+    text-align-last: center;
+    top: 152px;
+    position: relative;
+    text-shadow: 3px 3px 4px #141414cf;
+}
+
+/*Hidden*/
+body > div > img.banner1{
+	display:none!important;
+}
+
+#background-bomb{
+	display:none!important;
+}
+
+#portador, #resultado{
+	display:none!important;
+}
+
+.Team1, .Team2, .Maps, .logo1b, .logo2b{
+	display:none!important;
+} 
+
+.Pause {
+  display:none;
+  opacity:0;
+}
+
+.K1, .K2, .D1, .D2, .A1, .A2{
+	display:none;
+}

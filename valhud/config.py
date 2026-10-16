@@ -58,6 +58,9 @@ DEFAULTS = {
     # Player webcams (SCC Player Cam): the spectated player's cam pops up
     # above the bottom of the screen.
     "cams": {"enabled": True},
+    # The agent select overlay (/agent-select): "pro" (the PRO Selector
+    # template) or "champions" (in the Champions 2025 HUD's style).
+    "agent_select": {"look": "pro"},
 
     # Which screen the "HUD on the game" window covers (0 = main screen).
     "overlay_screen": 0,
@@ -129,6 +132,9 @@ def web_file(rel):
     # The scoreboard shares the HUD's agent, weapon and shield images.
     if rel.startswith("scoreboard/Resources/"):
         candidates.append((WEB_DIR, "hud/Resources/" + rel[len("scoreboard/Resources/"):]))
+    # So does the agent select template, for maps and weapons.
+    if rel.lower().startswith(("select/resources/maps/", "select/resources/armas/")):
+        candidates.append((WEB_DIR, "hud/Resources/" + rel[len("select/Resources/"):]))
     for base, sub in candidates:
         path = os.path.normpath(os.path.join(base, sub))
         if not path.startswith(os.path.normpath(base) + os.sep):
