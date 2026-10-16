@@ -55,6 +55,9 @@ DEFAULTS = {
     "player_names": {"left": ["", "", "", "", ""], "right": ["", "", "", "", ""]},
     # Timeout diamonds under the score; keep the scoreboard overlay on screen.
     "show": {"timeouts": True, "scoreboard": False},
+    # Player webcams (SCC Player Cam): the spectated player's cam pops up
+    # above the bottom of the screen.
+    "cams": {"enabled": True},
 
     # Which screen the "HUD on the game" window covers (0 = main screen).
     "overlay_screen": 0,

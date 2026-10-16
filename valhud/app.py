@@ -16,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import game, outputs, recolor
+from .cams import CamHub
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
 from .demo import DemoGame
 from .log import log, since
@@ -57,6 +58,7 @@ class HudApp:
         self._last_round = None
         # The observer client's reading of who it's spectating: (text, time).
         self.spectating = ("", 0.0)
+        self.cams = CamHub()   # player webcams (SCC Player Cam, VALORANT mode)
 
     def set_mode(self, mode, speed=None):
         """Switch between the live feed ("live") and a simulated match ("demo")."""
@@ -195,8 +197,29 @@ class HudApp:
 
     def snapshot(self):
         with self._lock:
-            return {"game": self.state, "fields": self.fields, "updated_at": self.updated_at,
+            players = list(self.state["players"])
+            snap = {"game": self.state, "fields": self.fields, "updated_at": self.updated_at,
                     "config": self.config.get(), "output_dir": self.config.output_dir(), "app": self.app_info()}
+        snap["cams"] = {"publishers": self.cams.publishers(players)}
+        return snap
+
+    def cam_post(self, path, body):
+        """Webcam messages (also from other PCs on the network)."""
+        if path == "/api/cam/poll":
+            result = self.cams.poll(str(body.get("id") or ""), body.get("riot_id"), body.get("label"), body.get("wait", 20))
+            if result["riot_id"]:
+                with self._lock:
+                    players = list(self.state["players"])
+                result["player"] = next((p["player"] for p in self.cams.publishers(players)
+                                         if p["id"] == body.get("id")), None)
+                cfg = self.config.get()
+                if result["player"]:
+                    result["player"]["team_name"] = cfg[result["player"]["team"]]["name"]
+            return result
+        if path == "/api/cam/send":
+            self.cams.send(str(body.get("to") or ""), str(body.get("from") or ""), body.get("data"))
+            return {"ok": True}
+        return None
 
     def save_logo(self, side, filename, data_b64):
         name = re.sub(r"[^A-Za-z0-9._-]", "_", os.path.basename(filename or "logo.png"))
@@ -396,11 +419,28 @@ def make_handler(app):
             else:
                 self._static(path.lstrip("/"))
 
+        def do_OPTIONS(self):
+            # Player cams post here from the Player Cam app's own page.
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+            self.send_header("Access-Control-Allow-Private-Network", "true")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
         def do_POST(self):
             # Other PCs may read the HUD (when allowed), but only this PC can
             # change it.
             url = urlparse(self.path)
             path = url.path
+            if path in ("/api/cam/poll", "/api/cam/send"):
+                length = int(self.headers.get("Content-Length") or 0)
+                try:
+                    body = json.loads(self.rfile.read(length) or b"{}")
+                    return self._send(json.dumps(app.cam_post(path, body)))
+                except (ValueError, TypeError, AttributeError) as e:
+                    return self._send(json.dumps({"error": str(e)}), status=400)
             # An observer PC's screen reader sends its readings here.
             lan_feed = path == "/api/ingest" and app.config.get().get("allow_network")
             if not _is_local(self.client_address[0]) and not lan_feed:

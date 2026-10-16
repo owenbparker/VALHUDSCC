@@ -247,6 +247,8 @@
     call("techpause", TechnicalPause, [!!cfg.tech_pause]);
     showBoard(wantBoard(m, cfg));
     setSponsors(cfg.sponsors, cfg.sponsor_seconds);
+    // The spectated player's webcam (web/cams.js), not over the scoreboard.
+    if (typeof window.renderCams === "function") window.renderCams(s, boardOn);
   }
 
   function poll() {

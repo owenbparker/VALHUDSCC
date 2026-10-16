@@ -75,6 +75,11 @@
   .fields div { display: flex; justify-content: space-between; gap: 8px; border-bottom: 1px solid var(--line); padding: 3px 0; cursor: copy; }
   .fields span:last-child { color: var(--muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%; }
   .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  .cam-list { display: grid; gap: 6px; }
+  .cam-list .cam { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  .cam-list .cam .who { margin-left: auto; color: var(--muted); }
+  .cam-list .cam .who.ok { color: var(--accent); }
+  .cam-list .none { color: var(--muted); font-size: 13px; }
   .drop { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; }
   .drop.over { border-color: var(--accent); color: var(--text); background: rgba(49,195,146,.06); }
   .sponsor-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -201,6 +206,16 @@
       <span class="note" id="sponsor-note" style="margin:0"></span>
     </div>
     <p class="note">Rotate in the top right of the HUD, in this order. Saving puts them on the HUD now and makes them the rotation every time the app starts. With none, the HUD shows its own two.</p>
+  </section>
+
+  <section class="wide">
+    <h2>Player cams</h2>
+    <label class="toggle"><input type="checkbox" id="cams-on"> Show the spectated player's webcam on the HUD</label>
+    <div id="cam-list" class="cam-list"></div>
+    <p class="note">Players run the <b>SCC Player Cam</b> app on their PC, pick VALORANT, enter this PC's address
+      (<span id="cam-address">tick "Let other PCs on the network read the HUD" in Outputs</span>) and their Riot ID.
+      When the observer is spectating them, their cam pops up above the bottom left of the HUD, framed in their
+      side's colour with their name and K / D / A.</p>
   </section>
 
   <section class="wide">
@@ -438,6 +453,7 @@ $("colors-reset").onclick = () => post("/api/config", { defense_color: COLOR_DEF
 
 function apply(s) {
   applySponsors(s.config);
+  applyCams(s);
   for (const k of ["defense", "attack"]) {
     const c = s.config[`${k}_color`] || COLOR_DEFAULTS[k];
     setIfIdle($(`${k}-color`), c);
@@ -533,6 +549,19 @@ document.querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click"
   const label = b.textContent; b.textContent = "Copied"; setTimeout(() => b.textContent = label, 1200);
 }));
 document.querySelectorAll("[data-open]").forEach(b => b.addEventListener("click", () => post("/api/open", { folder: b.dataset.open })));
+$("cams-on").onchange = e => post("/api/config", { cams: { enabled: e.target.checked } });
+function applyCams(s) {
+  $("cams-on").checked = (s.config.cams || {}).enabled !== false;
+  const pubs = (s.cams || {}).publishers || [], cfg = s.config;
+  const esc = t => String(t || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const html = pubs.length ? pubs.map(p => `<div class="cam"><b>${esc(p.riot_id)}</b><span class="note" style="margin:0">${esc(p.label)}</span>` +
+      (p.player ? `<span class="who ok">${esc(p.player.name)} (${esc(cfg[p.player.team].tricode)})</span>`
+                : `<span class="who">not in this match's players yet</span>`) + `</div>`).join("")
+    : `<div class="none">No player cams connected.</div>`;
+  if ($("cam-list").dataset.html !== html) { $("cam-list").dataset.html = html; $("cam-list").innerHTML = html; }
+  const host = s.app.lan_url ? s.app.lan_url.replace(/^https?:\/\//, "") : "";
+  $("cam-address").textContent = host ? host : 'tick "Let other PCs on the network read the HUD" in Outputs first';
+}
 $("network").onchange = e => post("/api/network", { enabled: e.target.checked });
 
 // Log.
