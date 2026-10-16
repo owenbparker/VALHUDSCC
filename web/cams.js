@@ -22,14 +22,19 @@
     "#scc-cam div { position: static; margin: 0; padding: 0; float: none; }" +
     "#scc-cam .scc-frame { position: absolute; inset: 0; background: #1f1e23; overflow: hidden;" +
     " box-shadow: inset 0 0 0 2px #000; }" +
-    "#scc-cam video { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 30px);" +
+    "#scc-cam video { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 34px);" +
     " object-fit: cover; opacity: 0; background: #3c3c46; }" +   // (a straight cut between players)
     "#scc-cam video.on { opacity: 1; }" +
-    "#scc-cam .scc-band { position: absolute; left: 2px; right: 2px; bottom: 2px; height: 26px; background: #1f1e23;" +
-    " display: flex; align-items: center; color: whitesmoke; font-family: Arabic, sans-serif; font-size: 18px; }" +
-    "#scc-cam .scc-bar { width: 4px; height: 18px; margin: 0 8px 0 6px; background: var(--team); transition: background .4s; }" +
+    // The name band: the side's colour as a strip down its full height at
+    // the left, the name and K / D / A centred in it, the same space in
+    // from either end.
+    "#scc-cam .scc-band { position: absolute; left: 2px; right: 2px; bottom: 2px; height: 30px; background: #1f1e23;" +
+    " display: flex; align-items: center; color: whitesmoke; font-family: Arabic, sans-serif; font-size: 18px; line-height: 1; }" +
+    "#scc-cam .scc-bar { align-self: stretch; flex: 0 0 6px; margin-right: 12px; background: var(--team); }" +
     "#scc-cam .scc-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }" +
-    "#scc-cam .scc-kda { padding: 0 10px 0 8px; white-space: nowrap; letter-spacing: .02em; }";
+    // (the HUD's own font sits low in its line: raised to the middle)
+    "#scc-cam .scc-name, #scc-cam .scc-kda { transform: translateY(-.11em); }" +
+    "#scc-cam .scc-kda { padding: 0 12px 0 10px; white-space: nowrap; letter-spacing: .02em; }";
   document.head.appendChild(style);
 
   var box = document.createElement("div");
@@ -107,10 +112,34 @@
     });
   });
 
+  // The name and K / D / A fonts: installed fonts chosen in the control
+  // panel, served by the app (so they show on any PC), and their sizes.
+  var fontKey = "";
+  function setFonts(cams) {
+    var key = JSON.stringify([cams.name_font, cams.kda_font, cams.name_size, cams.kda_size]);
+    if (key === fontKey) return;
+    fontKey = key;
+    var css = "";
+    [["name", cams.name_font], ["kda", cams.kda_font]].forEach(function (f) {
+      if (f[1]) css += '@font-face { font-family: "SCC cam ' + f[0] + '"; src: url("/fonts/local/' + encodeURIComponent(f[1]) + '"); }';
+    });
+    var el = document.getElementById("scc-cam-fonts");
+    if (!el) { el = document.createElement("style"); el.id = "scc-cam-fonts"; document.head.appendChild(el); }
+    el.textContent = css;
+    var name = box.querySelector(".scc-name"), kda = box.querySelector(".scc-kda");
+    name.style.fontFamily = cams.name_font ? '"SCC cam name", Arabic, sans-serif' : "";
+    kda.style.fontFamily = cams.kda_font ? '"SCC cam kda", Arabic, sans-serif' : "";
+    name.style.transform = cams.name_font ? "none" : "";
+    kda.style.transform = cams.kda_font ? "none" : "";
+    name.style.fontSize = (Number(cams.name_size) || 18) + "px";
+    kda.style.fontSize = (Number(cams.kda_size) || 18) + "px";
+  }
+
   // Called by driver.js with each state; hide: the buy-phase scoreboard is up.
   window.renderCams = function (s, hide) {
     var cfg = s.config, m = s.game.match, pubs = (s.cams || {}).publishers || [];
     var on = (cfg.cams || {}).enabled !== false;
+    setFonts(cfg.cams || {});
     var wanted = {};
     pubs.forEach(function (p) {
       if (!on) return;

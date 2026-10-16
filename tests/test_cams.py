@@ -3,6 +3,7 @@ import os
 import tempfile
 import threading
 import unittest
+import urllib.parse
 import urllib.request
 
 from valhud.cams import CamHub, clean_riot_id, match_players, name_matches
@@ -89,3 +90,30 @@ class ServerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FontTests(unittest.TestCase):
+    def test_installed_fonts_listed_and_served(self):
+        from valhud import fonts
+        found = fonts.installed()
+        if not found:
+            self.skipTest("no fonts installed here")
+        family = sorted(found)[0]
+        from valhud.app import HudApp, start
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg = Config(os.path.join(tmp, "config.json"))
+            cfg.update({"http_port": 8798, "output_dir": os.path.join(tmp, "out")})
+            app = HudApp(cfg)
+            app.updater.check_in_background = lambda: None
+            start(app)
+            try:
+                listed = json.loads(urllib.request.urlopen("http://127.0.0.1:8798/api/fonts", timeout=20).read())["fonts"]
+                self.assertIn(family, listed)
+                url = "http://127.0.0.1:8798/fonts/local/" + urllib.parse.quote(family)
+                with urllib.request.urlopen(url, timeout=5) as r:
+                    self.assertGreater(len(r.read()), 1000)
+                with self.assertRaises(urllib.error.HTTPError):
+                    urllib.request.urlopen("http://127.0.0.1:8798/fonts/local/..%2F..%2Fetc%2Fpasswd", timeout=5)
+                self.assertEqual(cfg.get()["cams"]["name_size"], 18)
+            finally:
+                app.stop()

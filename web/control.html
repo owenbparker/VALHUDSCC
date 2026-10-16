@@ -79,6 +79,8 @@
   .select-players .pick span { flex: 0 0 90px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .select-players .pick select { flex: 1; min-width: 0; }
   .select-players .pick label { display: flex; align-items: center; gap: 4px; margin: 0; flex: 0 0 auto; color: var(--muted); }
+  .cam-fonts { margin-bottom: 10px; }
+  .cam-fonts label span { float: right; color: var(--text); }
   .cam-list { display: grid; gap: 6px; }
   .cam-list .cam { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
   .cam-list .cam .who { margin-left: auto; color: var(--muted); }
@@ -236,6 +238,12 @@
   <section class="wide">
     <h2>Player cams</h2>
     <label class="toggle"><input type="checkbox" id="cams-on"> Show the spectated player's webcam on the HUD</label>
+    <div class="row cam-fonts">
+      <div><label>Name font</label><select id="cam-name-font"></select>
+        <label>Name size <span id="cam-name-size-val"></span></label><input type="range" id="cam-name-size" min="10" max="32" step="1"></div>
+      <div><label>K / D / A font</label><select id="cam-kda-font"></select>
+        <label>K / D / A size <span id="cam-kda-size-val"></span></label><input type="range" id="cam-kda-size" min="10" max="32" step="1"></div>
+    </div>
     <div id="cam-list" class="cam-list"></div>
     <p class="note">Players run the <b>SCC Player Cam</b> app on their PC, pick VALORANT, enter this PC's address
       (<span id="cam-address">tick "Let other PCs on the network read the HUD" in Outputs</span>) and their Riot ID.
@@ -621,8 +629,41 @@ function applySelect(s) {
     });
   }
 }
+// The cam's name and K / D / A: any font installed on this PC, and sizes.
+let camFonts = null;
+async function loadCamFonts() {
+  try { camFonts = (await (await fetch("/api/fonts")).json()).fonts || []; } catch (e) { camFonts = []; }
+  if (!camFonts.length) return setTimeout(loadCamFonts, 3000);   // (still being listed)
+  const esc = t => t.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  for (const id of ["cam-name-font", "cam-kda-font"]) {
+    $(id).innerHTML = '<option value="">HUD font (default)</option>' +
+      camFonts.map(f => `<option value="${esc(f)}" style="font-family:'${esc(f)}'">${esc(f)}</option>`).join("");
+  }
+  if (state) applyCams(state);
+}
+loadCamFonts();
+$("cam-name-font").onchange = e => post("/api/config", { cams: { name_font: e.target.value } });
+$("cam-kda-font").onchange = e => post("/api/config", { cams: { kda_font: e.target.value } });
+for (const [id, key] of [["cam-name-size", "name_size"], ["cam-kda-size", "kda_size"]]) {
+  let t;
+  $(id).addEventListener("input", e => {
+    $(`${id}-val`).textContent = e.target.value + " px";
+    clearTimeout(t);
+    t = setTimeout(() => post("/api/config", { cams: { [key]: Number(e.target.value) } }), 120);
+  });
+}
 function applyCams(s) {
-  $("cams-on").checked = (s.config.cams || {}).enabled !== false;
+  const cc = s.config.cams || {};
+  $("cams-on").checked = cc.enabled !== false;
+  if (camFonts && camFonts.length) {
+    for (const [id, key] of [["cam-name-font", "name_font"], ["cam-kda-font", "kda_font"]]) {
+      const sel = $(id), want = cc[key] || "";
+      if (want && ![...sel.options].some(o => o.value === want)) sel.add(new Option(want + " (not on this PC)", want));
+      setIfIdle(sel, want);
+    }
+  }
+  for (const [id, key] of [["cam-name-size", "name_size"], ["cam-kda-size", "kda_size"]])
+    if (document.activeElement !== $(id)) { $(id).value = cc[key] || 18; $(`${id}-val`).textContent = (cc[key] || 18) + " px"; }
   const pubs = (s.cams || {}).publishers || [], cfg = s.config;
   const esc = t => String(t || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const html = pubs.length ? pubs.map(p => `<div class="cam"><b>${esc(p.riot_id)}</b><span class="note" style="margin:0">${esc(p.label)}</span>` +

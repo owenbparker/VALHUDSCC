@@ -486,6 +486,24 @@ def make_handler(app):
                 self._send(outputs.to_csv(fields), "text/csv; charset=utf-8")
             elif path == "/hud.xml":
                 self._send(outputs.to_xml(fields), "application/xml; charset=utf-8")
+            elif path == "/api/fonts":
+                from . import fonts
+                self._send(json.dumps({"fonts": fonts.families()}))
+            elif path.startswith("/fonts/local/"):
+                # An installed font, for the player cam's name and K / D / A.
+                from . import fonts
+                file = fonts.path_of(unquote(path[len("/fonts/local/"):]))
+                if not file:
+                    return self._send('{"error":"not found"}', status=404)
+                with open(file, "rb") as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "font/otf" if file.lower().endswith(".otf") else "font/ttf")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "max-age=3600")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
             elif path == "/api/logos":
                 self._send(json.dumps(app.list_logos()))
             else:
@@ -620,6 +638,8 @@ def start(app):
         app.reader.set_enabled(True)
     clean_up_old_update()
     app.updater.check_in_background()
+    from . import fonts
+    threading.Thread(target=fonts.installed, daemon=True).start()   # (the font list, ready for the panel)
     threading.Thread(target=app.run_poller, daemon=True).start()
     log(f"VALORANT HUD {app.updater.current} running - control panel http://localhost:{port}/control")
     log(f"Overlay (browser source, 1920x1080): http://localhost:{port}/overlay")
