@@ -51,11 +51,52 @@
     if (list.length > 1) sponsor.timer = setInterval(next, Math.max(1, Number(seconds) || 4) * 1000);
   }
 
+  // Player names shrink until the whole name fits on its card (the
+  // template's name box is widened to the card, keeping its edge).
+  var BASE = 18, MIN = 9, WIDTH = 140;
+  function fitName(t, slot, text) {
+    var el = document.querySelector(t === 0 ? ".TIP" + slot + " > div.Name" : ".TDP" + slot + " > div.Name2");
+    if (!el || (el.dataset.text === text && el.dataset.fitted)) return;
+    el.dataset.text = text;
+    el.style.whiteSpace = "nowrap";
+    el.style.overflow = "hidden";
+    el.style.width = WIDTH + "px";
+    if (t === 1) el.style.left = (67 + 96 - WIDTH) + "px";   // right-aligned: same right edge
+    shrink(el, BASE, MIN);
+  }
+  function shrink(el, base, min) {
+    var size = base;
+    el.style.fontSize = size + "px";
+    while (el.scrollWidth > el.clientWidth + 0.5 && size > min) el.style.fontSize = (size -= 1) + "px";
+    el.dataset.fitted = document.fonts.status === "loaded" ? "1" : "";
+  }
+  // Team names: one line, shrunk to fit (the template wraps them onto the cards).
+  function fitTeams(left, right) {
+    [[".Team1b", left], [".Team2b", right]].forEach(function (t) {
+      var el = document.querySelector(t[0]);
+      if (!el || (el.dataset.text === t[1] && el.dataset.fitted)) return;
+      el.dataset.text = t[1];
+      el.style.whiteSpace = "nowrap";
+      el.style.overflow = "hidden";
+      // A smaller name stays centred on the full-size one's line.
+      el.style.transform = "";
+      el.style.fontSize = "55px";
+      var r = el.getBoundingClientRect(), mid = r.top + r.height / 2;
+      shrink(el, 55, 26);
+      r = el.getBoundingClientRect();
+      el.style.transform = "translateY(" + (mid - (r.top + r.height / 2)) + "px)";
+    });
+  }
+  if (document.fonts) document.fonts.ready.then(function () {
+    document.querySelectorAll("[data-text]").forEach(function (el) { el.dataset.fitted = ""; });
+  });
+
   function apply(s) {
     var a = s.agent_select || {}, cfg = s.config;
     document.documentElement.classList.toggle("scc-off", !a.active && params.get("always") !== "1");
 
     call("names", SetNameTeams, [cfg.left.name, cfg.left.tricode, cfg.right.name, cfg.right.tricode]);
+    fitTeams(cfg.left.name, cfg.right.name);
     setLogos("left", cfg.left.logo);
     setLogos("right", cfg.right.logo);
     setSponsors(cfg.sponsors, cfg.sponsor_seconds);
@@ -79,6 +120,7 @@
       ((a.players || {})[side] || []).forEach(function (p, i) {
         var slot = i + 1, k = side + slot;
         call(k + "name", SetNamePlayer, [t, slot, p.name || ""]);
+        fitName(t, slot, p.name || "");
         call(k + "agent", SetPlayerAgent, [t, slot, p.agent || ""]);
         var card = document.querySelector((t === 0 ? ".TIP" : ".TDP") + slot);
         if (card) card.classList.toggle("scc-silhouette", !!p.agent && !p.locked);
