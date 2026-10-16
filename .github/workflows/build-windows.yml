@@ -96,9 +96,12 @@ jobs:
           name: overlay-test
           path: overlay-test
 
-      - name: Add readme
+      - name: Add readme and version.txt
         shell: pwsh
-        run: Copy-Item README.md dist\ValorantHUD\
+        run: |
+          Copy-Item README.md dist\ValorantHUD\
+          # (the SCC HUD Manager reads the installed version from it)
+          Set-Content dist\ValorantHUD\version.txt $env:VERSION -NoNewline
 
       - uses: actions/upload-artifact@v4
         with:
