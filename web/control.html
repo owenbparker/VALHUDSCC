@@ -130,6 +130,7 @@
   .feed { font-size: 13px; }
   .feed code { display: inline; }
 </style>
+<link rel="stylesheet" href="shell.css">
 </head>
 <body>
 <header>
@@ -154,12 +155,12 @@
 </header>
 <div class="layout">
 <main>
-  <section class="wide">
+  <section class="wide" data-page="teams">
     <h2>Teams</h2>
     <div class="teams"><div class="team left" data-side="left"></div><div class="team right" data-side="right"></div></div>
   </section>
 
-  <section>
+  <section data-page="tournament">
     <h2>Series &amp; maps</h2>
     <div class="row">
       <div><label>Best of</label><select id="best-of"><option value="1">1</option><option value="3">3</option><option value="5">5</option></select></div>
@@ -169,7 +170,7 @@
     <div class="maps" id="maps"></div>
   </section>
 
-  <section>
+  <section data-page="live">
     <h2>Broadcast</h2>
     <label>Timeouts left</label>
     <div class="row">
@@ -186,7 +187,7 @@
     <label class="toggle" style="margin-top:12px"><input type="checkbox" id="show-timeouts"> Timeout diamonds under the score</label>
   </section>
 
-  <section>
+  <section data-page="editor">
     <h2>HUD colours</h2>
     <p class="note" style="margin-top:0">The HUD's two side colours. They still swap at half time, with the sides.</p>
     <div class="row">
@@ -198,7 +199,7 @@
     <button id="colors-reset" style="margin-top:10px">Back to teal &amp; red</button>
   </section>
 
-  <section class="wide">
+  <section class="wide" data-page="teams">
     <h2>Players</h2>
     <p class="note" style="margin:0 0 8px">Names typed here replace the ones from the game. Leave blank to use the game's.</p>
     <div class="row" style="margin:0 0 10px">
@@ -208,7 +209,7 @@
     <div class="players"><div id="players-left"></div><div id="players-right"></div></div>
   </section>
 
-  <section class="wide">
+  <section class="wide" data-page="tournament">
     <h2>Sponsors</h2>
     <div id="sponsor-drop" class="drop" tabindex="0">Drop sponsor logos here, or <u>choose files</u>
       <input type="file" id="sponsor-files" accept=".png,.jpg,.jpeg,.webp,.gif,.svg" multiple hidden></div>
@@ -221,7 +222,7 @@
     <p class="note">Rotate in the top right of the HUD, in this order. Saving puts them on the HUD now and makes them the rotation every time the app starts. With none, the HUD shows its own two.</p>
   </section>
 
-  <section class="wide">
+  <section class="wide" data-page="agents">
     <h2>Agent select</h2>
     <div class="out"><span>Agent select overlay (OBS / vMix browser source, 1920×1080): shows itself during agent select</span>
       <div class="row"><code id="url-select"></code><button data-copy="url-select">Copy</button></div></div>
@@ -242,7 +243,7 @@
       of the series.</p>
   </section>
 
-  <section class="wide">
+  <section class="wide" data-page="teams">
     <h2>Player cams</h2>
     <label class="toggle"><input type="checkbox" id="cams-on"> Show the spectated player's webcam on the HUD</label>
     <div class="row cam-fonts">
@@ -258,7 +259,7 @@
       with their name and K / D / A by a strip in their side's colour.</p>
   </section>
 
-  <section class="wide">
+  <section class="wide" data-page="live overview">
     <h2>Live data</h2>
     <button id="reader" class="read-btn">Read VALORANT on this PC</button>
     <div class="note" id="reader-status" style="margin:8px 0 10px"></div>
@@ -277,12 +278,12 @@
   </section>
 </main>
 <aside>
-  <section>
+  <section data-page="editor live">
     <h2>Preview</h2>
     <div class="preview" id="preview"><iframe src="/overlay" title="Overlay preview"></iframe></div>
   </section>
 
-  <section>
+  <section data-page="overview">
     <h2>Outputs</h2>
     <div class="out"><span>HUD overlay (OBS / vMix browser source, 1920×1080)</span>
       <div class="row"><code id="url-overlay"></code><button data-copy="url-overlay">Copy</button></div></div>
@@ -297,12 +298,14 @@
       <div class="row"><code id="url-lan"></code><button data-copy="url-lan">Copy</button></div></div>
   </section>
 
-  <section>
+  <section data-page="overview">
     <h2>Log</h2>
     <div class="log" id="log"></div>
   </section>
 </aside>
 </div>
+<script>window.SHELL = {"app": "VALORANT HUD", "logo": "assets/app_icon.png", "pages": [{"id": "overview", "label": "Overview"}, {"id": "editor", "label": "HUD Editor"}, {"id": "teams", "label": "Players & Teams", "group": "Event setup"}, {"id": "tournament", "label": "Tournament", "group": "Event setup"}, {"id": "live", "label": "Live Game", "group": "Live game"}, {"id": "agents", "label": "Agent Select", "icon": "draft", "group": "Live game"}]};</script>
+<script src="shell.js"></script>
 <script src="update.js"></script>
 <script>
 const $ = id => document.getElementById(id);
