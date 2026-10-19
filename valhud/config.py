@@ -73,6 +73,8 @@ DEFAULTS = {
     "sponsor_seconds": 4,
     # Observer client: the GFX PC whose HUD to show.
     "observer_url": "",
+    # The SCC GFX Engine this HUD sends its game and series to (see valhud/enginelink.py).
+    "gfx_engine": {"url": "", "name": "", "connected": False},
 }
 
 _lock = threading.Lock()

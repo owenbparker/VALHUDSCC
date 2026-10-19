@@ -263,3 +263,96 @@ class FileTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EngineLinkTests(unittest.TestCase):
+    def test_connect_send_and_use_global(self):
+        import time
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        from unittest import mock
+        from valhud import app as app_module
+        from valhud.app import HudApp, start
+        engine_port, hud_port = 8805, 8806
+        logo = b"\x89PNG\r\n\x1a\n" + b"fake-logo"
+        ingests = []
+
+        class Engine(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def _json(self, data):
+                body = json.dumps(data).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self):
+                if self.path == "/api/hello":
+                    return self._json({"app": "scc-gfx-engine", "name": "Test"})
+                if self.path == "/api/global":
+                    base = f"http://127.0.0.1:{engine_port}"
+                    return self._json({"global": {
+                        "left": {"name": "Sentinels", "short": "SEN", "logo_url": base + "/logo.png"},
+                        "right": {"name": "Fnatic", "short": "FNC", "logo_url": base + "/logo.png"}}})
+                if self.path == "/logo.png":
+                    self.send_response(200)
+                    self.send_header("Content-Length", str(len(logo)))
+                    self.end_headers()
+                    return self.wfile.write(logo)
+                self.send_response(404)
+                self.end_headers()
+
+            def do_POST(self):
+                length = int(self.headers.get("Content-Length") or 0)
+                ingests.append(json.loads(self.rfile.read(length)))
+                self._json({"ok": True, "global": {}})
+
+        engine = ThreadingHTTPServer(("127.0.0.1", engine_port), Engine)
+        threading.Thread(target=engine.serve_forever, daemon=True).start()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(app_module, "LOGO_DIR", os.path.join(tmp, "logos")):
+            cfg = Config(os.path.join(tmp, "config.json"))
+            cfg.update({"http_port": hud_port, "output_dir": os.path.join(tmp, "out")})
+            app = HudApp(cfg)
+            app.updater.check_in_background = lambda: None
+            start(app)
+            try:
+                def post(path, body=None):
+                    req = urllib.request.Request(f"http://127.0.0.1:{hud_port}{path}", json.dumps(body or {}).encode(),
+                                                 {"Content-Type": "application/json"})
+                    return json.loads(urllib.request.urlopen(req, timeout=10).read())
+
+                status = post("/api/engine/connect", {"url": f"127.0.0.1:{engine_port}"})
+                self.assertTrue(status["connected"])
+                self.assertEqual(status["name"], "Test")
+                self.assertEqual(cfg.get()["gfx_engine"]["url"], f"http://127.0.0.1:{engine_port}")
+                deadline = time.time() + 10
+                while not ingests and time.time() < deadline:
+                    time.sleep(0.1)
+                self.assertTrue(ingests, "the HUD never sent to the engine")
+                body = ingests[-1]
+                self.assertEqual(body["source"], "VALORANT HUD")
+                self.assertEqual(body["game"], "valorant")
+                self.assertEqual(body["series"]["left"]["short"], "SCC")
+                self.assertEqual(body["series"]["best_of"], 3)
+                self.assertIn("TEAM LEFT", body["fields"])
+                self.assertIn("LEFT P1 AGENT", body["fields"])
+                state = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{hud_port}/api/engine", timeout=5).read())
+                self.assertTrue(state["connected"])
+
+                reply = post("/api/engine/use-global")
+                self.assertIn("Sentinels", reply["summary"])
+                c = cfg.get()
+                self.assertEqual((c["left"]["name"], c["left"]["tricode"]), ("Sentinels", "SEN"))
+                self.assertEqual((c["right"]["name"], c["right"]["tricode"]), ("Fnatic", "FNC"))
+                self.assertEqual(c["left"]["logo"], "assets/logos/engine-SEN.png")
+                with open(os.path.join(tmp, "logos", "engine-FNC.png"), "rb") as f:
+                    self.assertEqual(f.read(), logo)
+                self.assertEqual(urllib.request.urlopen(f"http://127.0.0.1:{hud_port}/enginelink.js",
+                                                        timeout=5).status, 200)
+                self.assertFalse(post("/api/engine/disconnect")["connected"])
+            finally:
+                app.stop()
+                engine.shutdown()
+                engine.server_close()
