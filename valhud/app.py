@@ -237,8 +237,8 @@ class HudApp:
                "graphics": [{"id": "agent-select", "name": "Agent select", "path": "/agent-select", "kind": "board"},
                             {"id": "hud", "name": "In-game HUD", "path": "/overlay", "kind": "overlay"},
                             {"id": "scoreboard", "name": "Scoreboard", "path": "/scoreboard", "kind": "overlay"},
-                            {"id": "map-bans-bo1", "name": "Map bans Bo1", "path": "/map-bans?bo=1", "kind": "board"},
-                            {"id": "map-bans-bo3", "name": "Map bans Bo3", "path": "/map-bans?bo=3", "kind": "board"}]}
+                            {"id": "map-bans-bo1", "name": "Map bans Bo1", "path": "/map-bans?bo=1", "kind": "board", "backdrop": True},
+                            {"id": "map-bans-bo3", "name": "Map bans Bo3", "path": "/map-bans?bo=3", "kind": "board", "backdrop": True}]}
         return {"fields": fields, "series": series, "hud": hud}
 
     def _engine_apply_global(self, g, fetch):

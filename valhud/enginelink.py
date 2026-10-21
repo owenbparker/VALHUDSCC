@@ -12,7 +12,8 @@ original, in hud-link/). A HUD makes one EngineLink with:
                   "short", "score", "color"}, "right": {...}, "best_of": n},
                   and optionally "hud": {"port", "network" (other PCs can
                   read the HUD), "graphics": [{"id", "name", "path", "kind"
-                  ("board" / "overlay")}]}: its own pages, which the engine
+                  ("board" / "overlay"), "backdrop" (a board: the engine
+                  puts its boards' backdrop and background loop behind it)}]}: its own pages, which the engine
                   adds to its graphics (e.g. VALORANT's agent select)}
     apply_global(g, fetch) -> a short summary of what changed: takes the
                   engine's global configuration (g["left"]["name"], "short",
