@@ -128,6 +128,20 @@
   .btns { display: flex; flex-wrap: wrap; gap: 8px; }
   .btns button.on { background: var(--accent); color: #06231a; border-color: var(--accent); font-weight: 600; }
   .feed { font-size: 13px; }
+  .mb-team-a { display: flex; gap: 24px; }
+  .mb-team-a label { border-bottom: 0; }
+  .mb-steps { margin-top: 10px; }
+  .mb-step { display: grid; grid-template-columns: 26px 150px minmax(0, 220px) 130px minmax(0, 160px); gap: 10px; align-items: center;
+             padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+  .mb-step .n { color: var(--muted); }
+  .mb-step .ban { color: #ff7b7b; }
+  .mb-step .pick { color: var(--accent); }
+  .mb-step .decider { color: #ffcf66; }
+  .mb-step select { padding: 5px 8px; }
+  .mb-step .who { color: var(--muted); text-align: right; }
+  .mb-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 4px 16px; }
+  .mb-pool label { display: flex; align-items: center; gap: 8px; margin: 0; padding: 6px 0; color: var(--text); font-size: 14px; cursor: pointer; }
+  .mb-pool input { width: 18px; height: 18px; accent-color: var(--accent); }
   .feed code { display: inline; }
 </style>
 <link rel="stylesheet" href="shell.css">
@@ -243,6 +257,33 @@
       of the series.</p>
   </section>
 
+  <section class="wide" data-page="mapbans">
+    <h2>Map bans</h2>
+    <div class="out"><span>Map bans graphics (OBS / vMix browser source, 1920×1080; also in GFX Engine under Game HUD)</span>
+      <div class="row"><code id="url-bans-bo1"></code><button data-copy="url-bans-bo1">Copy</button></div>
+      <div class="row" style="margin-top:6px"><code id="url-bans-bo3"></code><button data-copy="url-bans-bo3">Copy</button></div></div>
+    <label>Team A (bans first)</label>
+    <div class="checks mb-team-a"><label><input type="checkbox" data-team-a="left"> <span></span></label>
+      <label><input type="checkbox" data-team-a="right"> <span></span></label></div>
+    <div class="row" style="margin-top:14px;align-items:center">
+      <div class="seg" id="mb-format" style="flex:0 0 auto"><button data-f="bo3">Best of 3</button><button data-f="bo1">Best of 1</button></div>
+      <span class="note" id="mb-order" style="margin:0"></span>
+      <button id="mb-clear" style="flex:0 0 auto">Clear</button>
+    </div>
+    <div class="mb-steps" id="mb-steps"></div>
+    <p class="note">The official VCT veto. Each graphic shows its own veto as you fill it in, live on air too: bans in grey,
+      picks and the decider in colour, with whose side pick it was.</p>
+  </section>
+
+  <section class="wide" data-page="mapbans">
+    <h2>Map pool</h2>
+    <div class="mb-pool" id="mb-pool"></div>
+    <div class="row" style="margin-top:10px;align-items:center">
+      <button id="mb-vct" style="flex:0 0 auto">Current VCT pool</button>
+      <span class="note" id="mb-pool-note" style="margin:0"></span>
+    </div>
+  </section>
+
   <section class="wide" data-page="teams">
     <h2>Player cams</h2>
     <label class="toggle"><input type="checkbox" id="cams-on"> Show the spectated player's webcam on the HUD</label>
@@ -316,14 +357,14 @@
   </section>
 </aside>
 </div>
-<script>window.SHELL = {"app": "VALORANT HUD", "logo": "assets/app_icon.png", "pages": [{"id": "overview", "label": "Overview"}, {"id": "editor", "label": "HUD Editor"}, {"id": "teams", "label": "Players & Teams", "group": "Event setup"}, {"id": "tournament", "label": "Tournament", "group": "Event setup"}, {"id": "live", "label": "Live Game", "group": "Live game"}, {"id": "agents", "label": "Agent Select", "icon": "draft", "group": "Live game"}, {"id": "engine", "label": "GFX Engine", "icon": "engine", "group": "Connections"}]};</script>
+<script>window.SHELL = {"app": "VALORANT HUD", "logo": "assets/app_icon.png", "pages": [{"id": "overview", "label": "Overview"}, {"id": "editor", "label": "HUD Editor"}, {"id": "teams", "label": "Players & Teams", "group": "Event setup"}, {"id": "tournament", "label": "Tournament", "group": "Event setup"}, {"id": "live", "label": "Live Game", "group": "Live game"}, {"id": "agents", "label": "Agent Select", "icon": "draft", "group": "Live game"}, {"id": "mapbans", "label": "Map Bans", "icon": "tournament", "group": "Live game"}, {"id": "engine", "label": "GFX Engine", "icon": "engine", "group": "Connections"}]};</script>
 <script src="enginelink.js"></script>
 <script src="shell.js"></script>
 <script src="update.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 let state = null;
-const MAPS = ["Abyss", "Ascent", "Bind", "Breeze", "Corrode", "Fracture", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Sunset"];
+const MAPS = ["Abyss", "Ascent", "Bind", "Breeze", "Corrode", "Fracture", "Haven", "Icebox", "Lotus", "Pearl", "Split", "Summit", "Sunset"];
 
 async function post(url, body) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -546,6 +587,7 @@ function apply(s) {
   setIfIdle($("best-of"), String(cfg.best_of));
   setIfIdle($("attack-first"), cfg.attack_first);
   renderMaps(cfg);
+  applyMapBans(s);
   $("tech-pause").classList.toggle("on", cfg.tech_pause);
   $("show-scoreboard").classList.toggle("on", cfg.show.scoreboard);
   $("show-timeouts").checked = cfg.show.timeouts !== false;
@@ -620,6 +662,68 @@ function selectPlayer(team, slot) {
   const row = document.querySelector(`#select-${team} .pick[data-slot="${slot}"]`);
   post("/api/agent-select", { players: [{ team, slot, agent: row.querySelector("select").value,
                                           locked: row.querySelector("input").checked }] });
+}
+// Map bans: Team A, the pool, and each step of the Bo1 / Bo3 veto.
+let mbFormat = null;
+const mbSave = (form, steps) => post("/api/config", { map_bans: { [form]: { steps } } });
+const mbSteps = form => state.map_bans[form].map(s => ({ map: s.auto ? "" : s.map, side: s.side }));
+document.querySelectorAll("[data-team-a]").forEach(b => b.onchange = () => {
+  const side = b.checked ? b.dataset.teamA : (b.dataset.teamA === "left" ? "right" : "left");
+  post("/api/config", { map_bans: { team_a: side } });
+});
+document.querySelectorAll("#mb-format button").forEach(b => b.onclick = () => { mbFormat = b.dataset.f; applyMapBans(state, true); });
+$("mb-clear").onclick = () => { if (confirm("Clear the " + (mbFormat === "bo1" ? "best of 1" : "best of 3") + " veto?")) mbSave(mbFormat, []); };
+$("mb-vct").onclick = () => post("/api/config", { map_bans: { pool: null } });
+function applyMapBans(s, force) {
+  const mb = s.map_bans, cfg = s.config;
+  if (!mb) return;
+  if (!mbFormat) mbFormat = Number(cfg.best_of) === 1 ? "bo1" : "bo3";
+  $("url-bans-bo1").textContent = `http://localhost:${s.app.port}/map-bans?bo=1`;
+  $("url-bans-bo3").textContent = `http://localhost:${s.app.port}/map-bans?bo=3`;
+  const tri = side => cfg[side].tricode, a = mb.team_a, b = a === "left" ? "right" : "left";
+  document.querySelectorAll("[data-team-a]").forEach(box => {
+    box.checked = box.dataset.teamA === a;
+    box.nextElementSibling.textContent = `${tri(box.dataset.teamA)} (${box.dataset.teamA} team)`;
+  });
+  document.querySelectorAll("#mb-format button").forEach(x => x.classList.toggle("on", x.dataset.f === mbFormat));
+  $("mb-order").textContent = mbFormat === "bo1"
+    ? `${tri(a)} bans, ${tri(b)} bans, three times each; the last map is the decider and ${tri(a)} picks its side.`
+    : `${tri(a)} bans, ${tri(b)} bans, ${tri(a)} picks (${tri(b)} picks side), ${tri(b)} picks (${tri(a)} picks side), ${tri(a)} bans, ${tri(b)} bans; the last map is the decider and ${tri(a)} picks its side.`;
+  // The pool.
+  const pool = $("mb-pool"), poolKey = JSON.stringify([mb.maps, mb.pool]);
+  if (pool.dataset.key !== poolKey) {
+    pool.dataset.key = poolKey;
+    pool.innerHTML = mb.maps.map(m => `<label><input type="checkbox" value="${m}" ${mb.pool.includes(m) ? "checked" : ""}> ${m}</label>`).join("");
+    pool.querySelectorAll("input").forEach(i => i.onchange = () =>
+      post("/api/config", { map_bans: { pool: [...pool.querySelectorAll("input:checked")].map(x => x.value) } }));
+  }
+  const vct = JSON.stringify(mb.pool) === JSON.stringify(mb.vct_pool);
+  $("mb-pool-note").textContent = (vct ? "The current VCT pool: " : `${mb.pool.length} maps: `) + mb.pool.join(", ") + "."
+    + (mb.pool.length !== 7 ? " A VCT veto uses 7 maps; pick the decider by hand." : "");
+  // The veto.
+  const box = $("mb-steps"), steps = mb[mbFormat];
+  const key = JSON.stringify([mbFormat, steps, mb.pool, cfg.left.tricode, cfg.right.tricode]);
+  if (!force && (box.dataset.key === key || box.contains(document.activeElement))) return;
+  box.dataset.key = key;
+  const VERB = { ban: "bans", pick: "picks", decider: "" };
+  box.innerHTML = steps.map((st, i) => {
+    const used = new Set(steps.filter((x, j) => j !== i && x.map && !x.auto).map(x => x.map));
+    const opts = mb.pool.filter(m => !used.has(m) || m === st.map);
+    if (st.map && !opts.includes(st.map)) opts.push(st.map);
+    const first = st.action === "decider" ? `<option value="">${st.auto ? st.map + " (last map left)" : "Last map left"}</option>` : '<option value="">—</option>';
+    const mapSel = `<select data-step="${i}">${first}${opts.map(m => `<option ${m === st.map && !st.auto ? "selected" : ""}>${m}</option>`).join("")}</select>`;
+    const side = st.side_team ? `<span class="who">${tri(st.side_team)} starts on</span>
+      <select data-side="${i}"><option value="">—</option><option value="attack" ${st.side === "attack" ? "selected" : ""}>Attack</option>
+      <option value="defence" ${st.side === "defence" ? "selected" : ""}>Defence</option></select>` : "<span></span><span></span>";
+    const what = st.action === "decider" ? '<span class="decider">Decider</span>' : `<span><b>${tri(st.team)}</b> <span class="${st.action}">${VERB[st.action]}</span></span>`;
+    return `<div class="mb-step"><span class="n">${i + 1}</span>${what}${mapSel}${side}</div>`;
+  }).join("");
+  box.querySelectorAll("[data-step]").forEach(sel => sel.onchange = () => {
+    const list = mbSteps(mbFormat); list[sel.dataset.step].map = sel.value; mbSave(mbFormat, list);
+  });
+  box.querySelectorAll("[data-side]").forEach(sel => sel.onchange = () => {
+    const list = mbSteps(mbFormat); list[sel.dataset.side].side = sel.value; mbSave(mbFormat, list);
+  });
 }
 function applySelect(s) {
   const a = s.agent_select || {};

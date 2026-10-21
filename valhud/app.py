@@ -15,7 +15,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import game, outputs, recolor
+from . import game, mapbans, outputs, recolor
 from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
@@ -68,6 +68,7 @@ class HudApp:
         self.cams = CamHub()   # player webcams (SCC Player Cam, VALORANT mode)
         self.agent_select = AgentSelect()
         self._select_demo = None
+        self.map_art = mapbans.MapArt()
 
     # --- agent select -------------------------------------------------------
 
@@ -235,7 +236,9 @@ class HudApp:
         hud = {"port": self.server.port if self.server else cfg["http_port"], "network": bool(cfg.get("allow_network")),
                "graphics": [{"id": "agent-select", "name": "Agent select", "path": "/agent-select", "kind": "board"},
                             {"id": "hud", "name": "In-game HUD", "path": "/overlay", "kind": "overlay"},
-                            {"id": "scoreboard", "name": "Scoreboard", "path": "/scoreboard", "kind": "overlay"}]}
+                            {"id": "scoreboard", "name": "Scoreboard", "path": "/scoreboard", "kind": "overlay"},
+                            {"id": "map-bans-bo1", "name": "Map bans Bo1", "path": "/map-bans?bo=1", "kind": "board"},
+                            {"id": "map-bans-bo3", "name": "Map bans Bo3", "path": "/map-bans?bo=3", "kind": "board"}]}
         return {"fields": fields, "series": series, "hud": hud}
 
     def _engine_apply_global(self, g, fetch):
@@ -320,6 +323,10 @@ class HudApp:
         snap["agent_select"] = self.agent_select.view(players)
         snap["agent_select"]["demo"] = bool(self._select_demo and self._select_demo.running())
         snap["agent_select"]["agents"] = game.AGENTS
+        cfg = snap["config"]
+        pool, team_a = mapbans.settings(cfg)
+        snap["map_bans"] = {"maps": mapbans.ALL_MAPS, "vct_pool": mapbans.VCT_POOL, "pool": pool, "team_a": team_a,
+                            "bo1": mapbans.steps(cfg, "bo1"), "bo3": mapbans.steps(cfg, "bo3")}
         return snap
 
     def cam_post(self, path, body):
@@ -548,6 +555,20 @@ def make_handler(app):
                 self.send_response(302)
                 self.send_header("Location", page + (f"?{url.query}" if url.query else ""))
                 self.end_headers()
+            elif path in ("/map-bans", "/map-bans/"):
+                # The map bans graphic (?bo=1 or ?bo=3).
+                self.send_response(302)
+                self.send_header("Location", "/mapbans/index.html" + (f"?{url.query}" if url.query else ""))
+                self.end_headers()
+            elif path == "/api/map-bans":
+                bo = (parse_qs(url.query).get("bo") or [str(app.config.get().get("best_of") or 3)])[0]
+                self._send(json.dumps(mapbans.view(app.config.get(), bo)))
+            elif path.startswith("/map-art/"):
+                art = app.map_art.path(unquote(path[len("/map-art/"):]))
+                if not art:
+                    return self._send('{"error":"not found"}', status=404)
+                with open(art, "rb") as f:
+                    self._send(f.read(), mimetypes.guess_type(art)[0] or "image/png")
             elif path in ("/control", "/start", "/observer"):
                 self._static(path[1:] + ".html")
             elif path == "/api/state":

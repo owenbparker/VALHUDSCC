@@ -111,6 +111,8 @@ Field values:
 
 On the **GFX Engine** page, connect to an SCC GFX Engine on the network: the HUD sends it the match. **Use Global Information** takes the engine's teams (names, tricodes, logos) and its sponsors (into the HUD's sponsor rotation, with their seconds each).
 
+**Live Game > Map Bans** runs the map veto for the two map bans graphics, **/map-bans?bo=1** and **/map-bans?bo=3** (1920×1080 browser sources, rebuilt from the vMix titles; also in GFX Engine under Game HUD as *Map bans Bo1* and *Map bans Bo3*). Tick Team A (bans first) and pick each map in the official VCT order: Bo1 is A ban, B ban three times, the last map is the decider and Team A picks its side; Bo3 is A ban, B ban, A pick (B picks side), B pick (A picks side), A ban, B ban, decider (Team A picks side). The map pool defaults to the current VCT pool (Abyss, Bind, Corrode, Haven, Lotus, Summit, Sunset as of October 2026), and any map can be ticked into it. Map art without a picture in the HUD (Summit) is downloaded from valorant-api.com the first time it's shown.
+
 The HUD also offers its own pages to the engine: **Agent select**, **In-game HUD** and **Scoreboard** show up in the engine's graphics under **Game HUD**, live from this HUD, to take on air from there. If the engine is on another PC, tick "Let other PCs on the network read the HUD".
 
 **Players & Teams > Players** lists each player in the game, **linked** (green) or **unlinked** (red) to their player in the team's roster on the engine (Teams > Team members), with **Save IGN to player**: pick their roster player and the in-game name is saved as their In-game ID on the engine, so the engine's graphics show them with their player name, headshot and flag.

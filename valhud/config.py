@@ -64,6 +64,10 @@ DEFAULTS = {
     # The agent select overlay (/agent-select): "pro" (the PRO Selector
     # template) or "champions" (in the Champions 2025 HUD's style).
     "agent_select": {"look": "pro"},
+    # Map bans (see valhud/mapbans.py): the map pool (None: the current VCT
+    # pool, as of this release), Team A (bans first) and each veto's steps.
+    "map_bans": {"pool": None, "team_a": "left",
+                 "bo1": {"steps": []}, "bo3": {"steps": []}},
 
     # Which screen the "HUD on the game" window covers (0 = main screen).
     "overlay_screen": 0,
