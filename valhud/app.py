@@ -231,7 +231,12 @@ class HudApp:
         series = {side: {"name": cfg[side]["name"], "short": cfg[side]["tricode"], "score": int(cfg[side].get("wins") or 0),
                          "color": cfg[side]["color"]} for side in ("left", "right")}
         series["best_of"] = int(cfg.get("best_of") or 3)
-        return {"fields": fields, "series": series}
+        # Its own pages, which GFX Engine adds to its graphics to take on air.
+        hud = {"port": self.server.port if self.server else cfg["http_port"], "network": bool(cfg.get("allow_network")),
+               "graphics": [{"id": "agent-select", "name": "Agent select", "path": "/agent-select", "kind": "board"},
+                            {"id": "hud", "name": "In-game HUD", "path": "/overlay", "kind": "overlay"},
+                            {"id": "scoreboard", "name": "Scoreboard", "path": "/scoreboard", "kind": "overlay"}]}
+        return {"fields": fields, "series": series, "hud": hud}
 
     def _engine_apply_global(self, g, fetch):
         """The GFX Engine's teams (names, short names, logos) and sponsors into the HUD."""
