@@ -107,6 +107,12 @@ Field values:
 - Agent and weapon names match the image folders (`KAY/O` is accepted as `Kayo`).
 - Send `"reset": true` to start a new match from scratch.
 
+## GFX Engine
+
+On the **GFX Engine** page, connect to an SCC GFX Engine on the network: the HUD sends it the match. **Use Global Information** takes the engine's teams (names, tricodes, logos) and its sponsors (into the HUD's sponsor rotation, with their seconds each).
+
+**Players & Teams > Players** lists each player in the game, **linked** (green) or **unlinked** (red) to their player in the team's roster on the engine (Teams > Team members), with **Save IGN to player**: pick their roster player and the in-game name is saved as their In-game ID on the engine, so the engine's graphics show them with their player name, headshot and flag.
+
 ## Running from source
 
 ```

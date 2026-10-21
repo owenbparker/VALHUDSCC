@@ -20,7 +20,7 @@ from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
 from .demo import DemoGame
-from .enginelink import EngineLink, save_logo_bytes
+from .enginelink import EngineLink, save_logo_bytes, save_sponsors
 from .log import log, since
 from .reader import ScreenReader
 from .source import LiveFeed
@@ -234,7 +234,7 @@ class HudApp:
         return {"fields": fields, "series": series}
 
     def _engine_apply_global(self, g, fetch):
-        """The GFX Engine's teams (names, short names, logos) into the HUD."""
+        """The GFX Engine's teams (names, short names, logos) and sponsors into the HUD."""
         changes, done = {}, []
         for side in ("left", "right"):
             t = g.get(side) or {}
@@ -253,8 +253,15 @@ class HudApp:
             if team:
                 changes[side] = team
                 done.append(f"{side}: {team.get('name') or team.get('tricode') or 'logo'}")
+        # Its sponsors, in the HUD's sponsor rotation.
+        sponsors, secs = save_sponsors(g, fetch, SPONSOR_DIR, "sponsors/", log)
+        if sponsors:
+            changes["sponsors"] = sponsors
+            if secs:
+                changes["sponsor_seconds"] = secs
+            done.append(f"{len(sponsors)} sponsor{'s' if len(sponsors) != 1 else ''}")
         if not changes:
-            raise ValueError("The engine's Global configuration has no team names or logos yet")
+            raise ValueError("The engine's Global configuration has no team names, logos or sponsors yet")
         self.config.update(changes)
         self.refresh(fetch=False)
         return ", ".join(done)
