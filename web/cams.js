@@ -34,12 +34,24 @@
     "#scc-cam .scc-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }" +
     // (the HUD's own font sits low in its line: raised to the middle)
     "#scc-cam .scc-name, #scc-cam .scc-kda { transform: translateY(-.11em); }" +
-    "#scc-cam .scc-kda { padding: 0 12px 0 10px; white-space: nowrap; letter-spacing: .02em; }";
+    "#scc-cam .scc-kda { padding: 0 12px 0 10px; white-space: nowrap; letter-spacing: .02em; }" +
+    // Kills this round: a tag in the side's colour that flies up out of the
+    // top of the frame at the first kill (and pops at each one after).
+    "#scc-cam .scc-kills { position: absolute; left: 2px; bottom: 100%; height: 28px; padding: 0 10px 0 8px;" +
+    " display: flex; align-items: center; gap: 6px; background: var(--team); color: #fff;" +
+    " font-family: Arabic, sans-serif; font-size: 20px; line-height: 1; opacity: 0; transform: translateY(28px);" +
+    " clip-path: inset(0 0 0 0); transition: opacity .2s ease, transform .4s cubic-bezier(.2,.8,.2,1); z-index: -1; }" +
+    "#scc-cam .scc-kills.on { opacity: 1; transform: none; }" +
+    "#scc-cam .scc-kills.pop { animation: scc-pop .35s ease; }" +
+    "#scc-cam .scc-kills span { transform: translateY(-.08em); }" +
+    "@keyframes scc-pop { 0% { transform: translateY(-6px) scale(1.12); } 100% { transform: none; } }";
   document.head.appendChild(style);
 
   var box = document.createElement("div");
   box.id = "scc-cam";
-  box.innerHTML = '<div class="scc-frame"><div class="scc-videos"></div>' +
+  box.innerHTML = '<div class="scc-kills"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff"' +
+    ' stroke-width="2"><circle cx="8" cy="8" r="5"/><path d="M8 0v4M8 12v4M0 8h4M12 8h4"/></svg><span></span></div>' +
+    '<div class="scc-frame"><div class="scc-videos"></div>' +
     '<div class="scc-band"><div class="scc-bar"></div><div class="scc-name"></div><div class="scc-kda"></div></div></div>';
   (document.body || document.documentElement).appendChild(box);
   var videos = box.querySelector(".scc-videos");
@@ -167,5 +179,13 @@
     box.style.setProperty("--team", colour || "#00ffcc");
     box.querySelector(".scc-name").textContent = player.name || "";
     box.querySelector(".scc-kda").textContent = [player.kills, player.deaths, player.assists].map(function (n) { return n || 0; }).join(" / ");
+    var kills = player.round_kills || 0, tag = box.querySelector(".scc-kills"), who = player.team + player.slot;
+    if (kills > 0) tag.querySelector("span").textContent = kills;
+    if (kills > 0 && tag.dataset.who === who && Number(tag.dataset.kills) > 0 && kills > Number(tag.dataset.kills)) {
+      tag.classList.remove("pop"); void tag.offsetWidth; tag.classList.add("pop");
+    }
+    tag.classList.toggle("on", kills > 0);
+    tag.dataset.who = who;
+    tag.dataset.kills = kills;
   };
 })();

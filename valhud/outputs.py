@@ -5,6 +5,7 @@ import io
 import json
 import os
 import re
+import threading
 from xml.sax.saxutils import escape
 
 
@@ -29,7 +30,8 @@ def to_xml(fields):
 def _write(path, text):
     # Write to a temp file then swap it in, so vMix never reads half a file.
     # If vMix has the file locked (Windows), fall back to writing in place.
-    tmp = path + ".tmp"
+    # (One temp file per thread: the poller and a feed can write at once.)
+    tmp = f"{path}.{threading.get_ident()}.tmp"
     with open(tmp, "w", encoding="utf-8", newline="") as f:
         f.write(text)
     try:

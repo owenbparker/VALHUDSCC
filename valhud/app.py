@@ -23,6 +23,7 @@ from .demo import DemoGame
 from .enginelink import EngineLink, save_logo_bytes, save_sponsors
 from .log import log, since
 from .reader import ScreenReader
+from .series import Series
 from .source import LiveFeed
 from .updater import Updater, clean_up_old_update
 
@@ -69,13 +70,19 @@ class HudApp:
         self.agent_select = AgentSelect()
         self._select_demo = None
         self.map_art = mapbans.MapArt()
+        self.series = Series(config, log)   # maps from Map Bans, won maps, the series score
 
     # --- agent select -------------------------------------------------------
 
     def agent_select_update(self, reading, source=""):
         """A reading of agent select (screen, demo or control panel). A map
         read off the screen becomes the map being played."""
+        was_active = self.agent_select.state["active"]
         new_map = self.agent_select.apply(reading, source)
+        if source != "demo" and reading.get("active") and not was_active:
+            # The next map: it's the current one, and the last one's data goes.
+            if self.series.agent_select_started():
+                self.feed.apply({"source": "agent select", "reset": True})
         if new_map and source != "demo":
             cfg = self.config.get()
             maps = [dict(m) for m in cfg.get("maps") or []]
@@ -200,7 +207,15 @@ class HudApp:
         if time.time() - at < self.SPECTATING_FOR:
             state["match"]["observed"] = (game.observed_player(state, text)
                                           or game.observed_by_agent(state, agent, side))
-        fields = game.fields(state, cfg)
+        if self.mode == "live" and fetch:
+            self.series.sync_maps()
+            self.series.round_kills(state)
+            fields = game.fields(state, cfg)
+            shown = self.series.watch(state, fields)
+            if shown is not state:   # cleared after the map
+                state, fields = shown, game.fields(shown, cfg)
+        else:
+            fields = game.fields(state, cfg)
         with self._lock:
             self.state, self.fields = state, fields
             self.updated_at = time.time()
@@ -228,7 +243,8 @@ class HudApp:
         """What the GFX Engine gets: the HUD's fields and the series."""
         cfg = self.config.get()
         with self._lock:
-            fields = dict(self.fields)
+            # (Once the HUD's cleared after a map, the stats are its last.)
+            fields = dict(self.series.stats or self.fields)
         series = {side: {"name": cfg[side]["name"], "short": cfg[side]["tricode"], "score": int(cfg[side].get("wins") or 0),
                          "color": cfg[side]["color"]} for side in ("left", "right")}
         series["best_of"] = int(cfg.get("best_of") or 3)

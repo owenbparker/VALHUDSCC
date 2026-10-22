@@ -1321,6 +1321,9 @@ class ScreenReader:
             try:
                 image, reason = capture_valorant()
                 if image is not None and self.select.check(image, self.ocr):
+                    if self.kda.base:   # a new game: last game's K/D/A is done with
+                        from .killfeed import LiveKda
+                        self.kda = LiveKda()
                     if self.select.empty_for() > 20:
                         self._keep_frame(image, "agent-select-unread")
                 elif image is not None and attacking_side(Frame(image)) is None:

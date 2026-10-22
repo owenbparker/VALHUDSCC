@@ -168,10 +168,26 @@
       SetP2 = Math.min(need, cfg.right.wins || 0);
       ModPL(); SetModoP1(); SetModoP2();
     }
-    (cfg.maps || []).slice(0, 3).forEach(function (map, i) {
-      var label = String(map.name || "").toUpperCase();
-      if (map.winner) label += " <span>" + cfg[map.winner].tricode + "</span>";
-      else if (i === cfg.current_map) label = "<span>" + label + "</span>";
+    // The series' maps across the top left: a won map with its score
+    // between the two logos, "CURRENT: ...", "NEXT: ..." (with the logo of
+    // the team that picked it) and, in a best of 3, "DECIDER: ...".
+    var shown = (cfg.best_of || 3) == 1 ? 1 : 3;
+    var logo = function (side) {
+      var src = side && cfg[side] && cfg[side].logo;
+      return src ? '<img src="/' + String(src).split("/").map(encodeURIComponent).join("/") +
+        '" style="height:13px;width:auto;margin:0 5px;vertical-align:-2px">' : "";
+    };
+    var esc = function (t) { return String(t || "").toUpperCase().replace(/[&<>"]/g, function (c) { return "&#" + c.charCodeAt(0) + ";"; }); };
+    [0, 1, 2].forEach(function (i) {
+      var map = i < shown ? (cfg.maps || [])[i] : null, label = "";
+      if (map && map.name) {
+        var name = esc(map.name);
+        if (map.winner && map.score) label = name + logo("left") + map.score.left + " - " + map.score.right + logo("right");
+        else if (map.winner) label = name + " <span>" + esc(cfg[map.winner].tricode) + "</span>";
+        else if (i === (cfg.current_map || 0)) label = "CURRENT: " + name + logo(map.picked_by);
+        else if (shown === 3 && i === 2) label = "DECIDER: " + name;
+        else label = "NEXT: " + name + logo(map.picked_by);
+      }
       call("map" + i, SetMapResult, [i, label]);
     });
 
