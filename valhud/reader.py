@@ -216,14 +216,21 @@ def _bright(img, level=185):
     return sum(1 for p in data if min(p) >= level) / max(1, len(data))
 
 
+def _bar_pixel(p):
+    r, g, b = p
+    return max(p) >= 170 or (r >= 90 and r - g >= 40 and r - b >= 30)
+
+
 def health_bar(frame, side, slot):
     """(alive, health 0-100) from the bar under a portrait."""
     x = TOP_X[side][slot - 1]
     strip = frame.crop(x - BAR_HALF, BAR_Y[0], x + BAR_HALF, BAR_Y[1])
-    # White when healthy, red when low: any bright pixel is bar.
-    cols = [any(max(strip.getpixel((cx, cy))) >= 170 for cy in range(strip.height)) for cx in range(strip.width)]
+    # White when healthy, red when low: any bright or red pixel is bar (the
+    # bar's frame is a dull grey, never either). At a few HP the bar is a
+    # pixel or so of red, so one column is enough: a dead player has no bar.
+    cols = [any(_bar_pixel(strip.getpixel((cx, cy))) for cy in range(strip.height)) for cx in range(strip.width)]
     lit = sum(cols)
-    if lit < 2:
+    if lit < 1:
         return False, 0
     if lit >= strip.width - 2:
         return True, 100   # full (the bar's ends are soft)
@@ -849,10 +856,15 @@ def read_frame(image, ocr=None, known_agents=None):
 
 def capture_valorant(top=None):
     """(image, None) with the VALORANT window's client area (only its top
-    `top` rows, in 1080p terms, if given), or (None, reason)."""
+    `top` rows, in 1080p terms, if given), or (None, reason).
+
+    While VALORANT is on top it's copied off the screen. When another window
+    covers it (someone tabbed into the HUD or a browser on this PC), the
+    screen shows that window instead, so VALORANT's own picture is asked for
+    (PrintWindow): it keeps being read wherever the focus is."""
     import ctypes
     from ctypes import wintypes
-    user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
+    user32 = ctypes.windll.user32
     found = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
@@ -870,19 +882,98 @@ def capture_valorant(top=None):
         return None, "VALORANT window not found"
     hwnd = found[0]
     if user32.IsIconic(hwnd):
-        return None, "VALORANT is minimised"
+        return None, ("VALORANT is minimised: set its Display Mode to Windowed Fullscreen so it keeps "
+                      "drawing while you're in another window")
     rect = wintypes.RECT()
     user32.GetClientRect(hwnd, ctypes.byref(rect))
     width, height = rect.right, rect.bottom
     if width < 200 or height < 200:
         return None, "VALORANT window is too small"
-    from PIL import ImageGrab
     point = wintypes.POINT(0, 0)
     user32.ClientToScreen(hwnd, ctypes.byref(point))
     rows = height if top is None else min(height, max(1, round(top * height / REF_H)))
-    image = ImageGrab.grab((point.x, point.y, point.x + width, point.y + rows), all_screens=True)
+    image = None if _uncovered(hwnd, point.x, point.y, width, rows) else _print_window(hwnd, width, height)
+    if image is not None:
+        if rows < height:
+            image = image.crop((0, 0, width, rows))
+    else:
+        # On top (or Windows wouldn't give its picture): what's on screen.
+        from PIL import ImageGrab
+        image = ImageGrab.grab((point.x, point.y, point.x + width, point.y + rows), all_screens=True)
     image.info["full_height"] = height
     return image, None
+
+
+def _uncovered(hwnd, x, y, width, height):
+    """Is VALORANT what's on screen across this area? (Checked at a grid of
+    points: the top bar, the middle and the corners.)"""
+    import ctypes
+    from ctypes import wintypes
+    user32 = ctypes.windll.user32
+    user32.WindowFromPoint.argtypes = [wintypes.POINT]
+    user32.WindowFromPoint.restype = wintypes.HWND
+    user32.GetAncestor.argtypes = [wintypes.HWND, ctypes.c_uint]
+    user32.GetAncestor.restype = wintypes.HWND
+    target = user32.GetAncestor(hwnd, 2) or hwnd   # GA_ROOT
+    for fx in (0.02, 0.25, 0.5, 0.75, 0.98):
+        for fy in (0.02, 0.5, 0.98):
+            pt = wintypes.POINT(x + int(width * fx), y + int(height * fy))
+            at = user32.WindowFromPoint(pt)
+            if not at or (user32.GetAncestor(at, 2) or at) != target:
+                return False
+    return True
+
+
+def _print_window(hwnd, width, height):
+    """The window's client area as Windows composes it, even when other
+    windows are over it, or None (it came back black: no picture)."""
+    import ctypes
+    from ctypes import wintypes
+    from PIL import Image
+    user32, gdi32 = ctypes.windll.user32, ctypes.windll.gdi32
+
+    class BITMAPINFOHEADER(ctypes.Structure):
+        _fields_ = [("biSize", wintypes.DWORD), ("biWidth", wintypes.LONG), ("biHeight", wintypes.LONG),
+                    ("biPlanes", wintypes.WORD), ("biBitCount", wintypes.WORD), ("biCompression", wintypes.DWORD),
+                    ("biSizeImage", wintypes.DWORD), ("biXPelsPerMeter", wintypes.LONG),
+                    ("biYPelsPerMeter", wintypes.LONG), ("biClrUsed", wintypes.DWORD),
+                    ("biClrImportant", wintypes.DWORD)]
+
+    gdi32.CreateCompatibleDC.restype = wintypes.HDC
+    gdi32.CreateDIBSection.restype = wintypes.HBITMAP
+    gdi32.CreateDIBSection.argtypes = [wintypes.HDC, ctypes.c_void_p, ctypes.c_uint,
+                                       ctypes.POINTER(ctypes.c_void_p), wintypes.HANDLE, wintypes.DWORD]
+    gdi32.SelectObject.restype = wintypes.HGDIOBJ
+    gdi32.SelectObject.argtypes = [wintypes.HDC, wintypes.HGDIOBJ]
+    gdi32.DeleteObject.argtypes = [wintypes.HGDIOBJ]
+    gdi32.DeleteDC.argtypes = [wintypes.HDC]
+    user32.PrintWindow.argtypes = [wintypes.HWND, wintypes.HDC, ctypes.c_uint]
+
+    info = BITMAPINFOHEADER()
+    info.biSize = ctypes.sizeof(BITMAPINFOHEADER)
+    info.biWidth, info.biHeight = width, -height   # top-down rows
+    info.biPlanes, info.biBitCount = 1, 32
+    bits = ctypes.c_void_p()
+    dc = gdi32.CreateCompatibleDC(None)
+    bitmap = gdi32.CreateDIBSection(dc, ctypes.byref(info), 0, ctypes.byref(bits), None, 0)
+    if not bitmap:
+        gdi32.DeleteDC(dc)
+        return None
+    old = gdi32.SelectObject(dc, bitmap)
+    try:
+        # PW_CLIENTONLY | PW_RENDERFULLCONTENT: DirectX games come out too.
+        if not user32.PrintWindow(hwnd, dc, 1 | 2):
+            return None
+        data = ctypes.string_at(bits, width * height * 4)
+    finally:
+        gdi32.SelectObject(dc, old)
+        gdi32.DeleteObject(bitmap)
+        gdi32.DeleteDC(dc)
+    image = Image.frombuffer("RGBX", (width, height), data, "raw", "BGRX", 0, 1).convert("RGB")
+    small = image.resize((64, 36))
+    if max(max(p) for p in _pixels(small)) < 8:
+        return None
+    return image
 
 
 def make_dpi_aware():
@@ -926,6 +1017,9 @@ class ScreenReader:
         self.agents = {}       # (side, slot) -> agent, kept for the match
         self._agent_votes = {}
         self.banner = BuyBanner()
+        from .killfeed import LiveKda
+        self.kda = LiveKda()   # K/D/A through the round (scoreboard + deaths + kill feed)
+        self._dead_reads = {}  # seat -> reads running its health bar's been gone (or back)
         self._stop = threading.Event()
         self._thread = None
         self.spectate, self.spectate_status = False, "off"
@@ -1053,6 +1147,26 @@ class ScreenReader:
             json.dump(update, f, indent=1)
         return base + ".png"
 
+    KEEP_EVERY, KEEP_MAX = 30.0, 20
+
+    def _keep_frame(self, image, why):
+        """Save a frame the reader couldn't make sense of to frames/auto (by
+        the app), at most one every 30 s and 20 a run: send them in to have
+        the reader taught that screen."""
+        now = time.time()
+        if now - getattr(self, "_kept_at", 0) < self.KEEP_EVERY or getattr(self, "_kept", 0) >= self.KEEP_MAX:
+            return
+        self._kept_at, self._kept = now, getattr(self, "_kept", 0) + 1
+        try:
+            from .config import DATA_DIR
+            folder = os.path.join(DATA_DIR, "frames", "auto")
+            os.makedirs(folder, exist_ok=True)
+            path = os.path.join(folder, time.strftime(f"%Y%m%d-%H%M%S-{why}.png"))
+            image.save(path)
+            log(f"Saved a frame the reader couldn't read: {path}")
+        except OSError:
+            pass
+
     def scan_names(self):
         """Read every name off the Tab scoreboard carefully and say whose
         seat each belongs to: {"left": {1: "name", ...}, "right": {...}}.
@@ -1101,7 +1215,10 @@ class ScreenReader:
                     update = {"source": "screen", "players": players}
                     if attacking_side(frame):   # the top bar's on screen: the phase can be told
                         update["match"] = {"phase": self.banner.seen(buy_phase(frame))}
-                    key = [(p["alive"], p["health"]) for p in players] + [update.get("match")]
+                        self._count_deaths(players)
+                    self._add_kda(players)
+                    key = [(p["alive"], p["health"], p.get("kills"), p.get("deaths")) for p in players] + \
+                        [update.get("match")]
                     if key != last or time.time() - sent_at > 1:
                         self.send(update)
                         last, sent_at = key, time.time()
@@ -1109,6 +1226,59 @@ class ScreenReader:
             except Exception:
                 pass  # the full read reports problems
             self._stop.wait(self.ALIVE_EVERY)
+
+    def _count_deaths(self, players):
+        """A health bar gone for two reads running is a death (one for each
+        life: the player has to be back, two reads running, first)."""
+        for p in players:
+            seat = (p["team"], p["slot"])
+            state, n = self._dead_reads.get(seat, (p["alive"], 0))
+            n = n + 1 if p["alive"] == state else 1
+            self._dead_reads[seat] = (p["alive"], n)
+            if n == 2:
+                self.kda.alive(seat, p["alive"])
+
+    def _add_kda(self, players, skip=()):
+        """Each player's K/D/A so far this round, where the scoreboard's been read."""
+        for p in players:
+            seat = (p["team"], p["slot"])
+            values = None if seat in skip else self.kda.values(seat)
+            if values:
+                p["kills"], p["deaths"], p["assists"] = values
+
+    def _read_kill_feed(self, image, update):
+        """Kills (and the killer's gun) off the kill feed, mid-round."""
+        from . import killfeed
+        attackers = update["match"].get("attackers")
+        if not attackers or update["match"].get("scoreboard_open") or self.banner.on:
+            return
+        by_seat = {(p["team"], p["slot"]): p for p in update["players"]}
+        for bar in self._kill_bars(Frame(image), attackers):
+            if bar["killer"] and bar["victim"] and not bar["team_kill"]:
+                if self.kda.kill(bar["killer"], bar["victim"]):
+                    log(f"Kill: {bar['killer']} -> {bar['victim']} ({bar['weapon'] or '?'})")
+            if bar["killer"] and bar["weapon"] and bar["weapon"] in game.WEAPONS:
+                by_seat[bar["killer"]]["weapon"] = bar["weapon"]
+
+    def _kill_bars(self, frame, attackers):
+        """killfeed.read(), remembering bars already read (a bar stays up a
+        few seconds and moves down as new ones come in)."""
+        from . import killfeed
+        np = _np()
+        cache = getattr(self, "_bar_cache", {})
+        now = time.time()
+        cache = {k: v for k, v in cache.items() if now - v[0] < 15}
+        out = []
+        seats = dict(self.agents)
+        for bar in killfeed.find_bars(frame):
+            x0, y0, x1, y1 = bar[:4]
+            sig = (bar[4], bar[5], (np.asarray(frame.crop(x0, y0, x1, y1).convert("L").resize((24, 4))) // 32).tobytes(),
+                   attackers, tuple(sorted(seats.items())))
+            if sig not in cache:
+                cache[sig] = (now, killfeed.read_bar(frame, bar, seats, attackers))
+            out.append(cache[sig][1])
+        self._bar_cache = cache
+        return out
 
     def _steady_score(self, update):
         """A new score only counts once it's been read the same twice in a
@@ -1151,11 +1321,30 @@ class ScreenReader:
             try:
                 image, reason = capture_valorant()
                 if image is not None and self.select.check(image, self.ocr):
-                    pass   # agent select (sent by the tracker): no match to read
-                elif image is not None:
+                    if self.select.empty_for() > 20:
+                        self._keep_frame(image, "agent-select-unread")
+                elif image is not None and attacking_side(Frame(image)) is None:
+                    # Neither agent select nor the match's top bar: a screen
+                    # the reader doesn't know (kept, a few, for tuning it).
+                    self._keep_frame(image, "unknown")
+                if image is None or self.select.active:
+                    pass   # (agent select is sent by the tracker: no match to read)
+                else:
                     update = read_frame(image, self.ocr, self.agents)
                     self._learn_agents(update)
                     self._steady_score(update)
+                    board = set()
+                    if update["match"].get("scoreboard_open"):
+                        for p in update["players"]:
+                            if all(p.get(k) is not None for k in ("kills", "deaths", "assists")):
+                                self.kda.board((p["team"], p["slot"]), p["kills"], p["deaths"], p["assists"])
+                                board.add((p["team"], p["slot"]))
+                    else:
+                        try:
+                            self._read_kill_feed(image, update)
+                        except Exception as e:
+                            log(f"Kill feed read failed: {e!r}", "warn")
+                    self._add_kda(update["players"], skip=board)
                     if time.time() - getattr(self, "fast_at", 0) < 2:
                         # The fast loop has newer alive/health and phase than this frame.
                         update["match"].pop("phase", None)
@@ -1189,10 +1378,15 @@ class SelectTracker:
         self.active = False
         self.checked_at = 0.0
         self.seen_at = 0.0
+        self.empty_since = 0.0
         self._names = {}
         self._steady = {}
         self._pending = {}
         self._lock = threading.Lock()
+
+    def empty_for(self):
+        """Seconds agent select's been on screen with no agent read on any card."""
+        return time.time() - self.empty_since if self.active and self.empty_since else 0.0
 
     def check(self, image, ocr):
         """Is agent select on screen? (If so, it's read and sent.)"""
@@ -1208,6 +1402,7 @@ class SelectTracker:
                 in_game = attacking_side(Frame(image)) is not None
                 if in_game or time.time() - self.seen_at > self.HOLD:
                     self.active = False
+                    self.empty_since = 0.0
                     self._names, self._steady, self._pending = {}, {}, {}
                     self.send({"source": "screen", "agent_select": {"active": False}})
                     log("Agent select over: the match is on")
@@ -1218,6 +1413,10 @@ class SelectTracker:
             if not self.active:
                 log("Agent select on screen" + (f" ({reading['map']})" if reading.get("map") else ""))
             self.active = True
+            if any(p["agent"] for p in reading["players"]):
+                self.empty_since = 0.0
+            elif not self.empty_since:
+                self.empty_since = time.time()
             for p in reading["players"]:
                 key, value = (p["team"], p["slot"]), (p["agent"], p["locked"])
                 if key not in self._steady or self._pending.get(key) == value:
