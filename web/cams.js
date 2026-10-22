@@ -25,6 +25,12 @@
     "#scc-cam video { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 34px);" +
     " object-fit: cover; opacity: 0; background: #3c3c46; }" +   // (a straight cut between players)
     "#scc-cam video.on { opacity: 1; }" +
+    // The demo's stand-in cam: the agent on a dark backdrop.
+    "#scc-cam .scc-dummy { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 34px);" +
+    " display: none; background: radial-gradient(circle at 50% 35%, #4a4a58, #23232b 70%) center / cover no-repeat; }" +
+    "#scc-cam .scc-dummy.on { display: block; }" +
+    "#scc-cam .scc-dummy i { position: absolute; right: 8px; top: 6px; font: 12px Arabic, sans-serif; color: #fff9;" +
+    " letter-spacing: .1em; font-style: normal; }" +
     // The name band: the side's colour as a strip down its full height at
     // the left, the name and K / D / A centred in it, the same space in
     // from either end.
@@ -51,7 +57,7 @@
   box.id = "scc-cam";
   box.innerHTML = '<div class="scc-kills"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#fff"' +
     ' stroke-width="2"><circle cx="8" cy="8" r="5"/><path d="M8 0v4M8 12v4M0 8h4M12 8h4"/></svg><span></span></div>' +
-    '<div class="scc-frame"><div class="scc-videos"></div>' +
+    '<div class="scc-frame"><div class="scc-videos"></div><div class="scc-dummy"><i>DEMO CAM</i></div>' +
     '<div class="scc-band"><div class="scc-bar"></div><div class="scc-name"></div><div class="scc-kda"></div></div></div>';
   (document.body || document.documentElement).appendChild(box);
   var videos = box.querySelector(".scc-videos");
@@ -171,7 +177,20 @@
     var peer = cam && peers[cam.id];
     var ready = !!(peer && peer.video.readyState >= 2);
     Object.keys(peers).forEach(function (id) { peers[id].video.classList.toggle("on", !!cam && id === cam.id); });
-    var show = on && !hide && ready && !!player;
+    // The demo match: everyone has a stand-in cam (so the cam and its
+    // kill tag can be seen without real ones).
+    var dummy = box.querySelector(".scc-dummy"), fake = (s.app || {}).mode === "demo" && !!player && !ready;
+    dummy.classList.toggle("on", fake);
+    if (fake && player.agent) {
+      var art = "url('/hud/Resources/Agentes/" + encodeURIComponent(player.agent) + "/" + encodeURIComponent(player.agent) + ".png')";
+      if (dummy.dataset.agent !== player.agent) {
+        dummy.dataset.agent = player.agent;
+        dummy.style.backgroundImage = art + ", radial-gradient(circle at 50% 35%, #4a4a58, #23232b 70%)";
+        dummy.style.backgroundSize = "auto 92%, cover";
+        dummy.style.backgroundPosition = "center bottom, center";
+      }
+    }
+    var show = on && !hide && (ready || fake) && !!player;
     box.classList.toggle("on", show);
     if (!player) return;
     // The bar by the name is in their side's colour (the sides swap at half time).

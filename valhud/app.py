@@ -207,9 +207,9 @@ class HudApp:
         if time.time() - at < self.SPECTATING_FOR:
             state["match"]["observed"] = (game.observed_player(state, text)
                                           or game.observed_by_agent(state, agent, side))
+        self.series.round_kills(state)
         if self.mode == "live" and fetch:
             self.series.sync_maps()
-            self.series.round_kills(state)
             fields = game.fields(state, cfg)
             shown = self.series.watch(state, fields)
             if shown is not state:   # cleared after the map

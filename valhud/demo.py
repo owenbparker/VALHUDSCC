@@ -133,6 +133,7 @@ class DemoGame:
                     self.__init__(self.speed, attack_first=self.attack_first, map_name=m["map"])
                 else:
                     self._new_round()
+        self._spectate()
 
     def _fight(self, dt):
         m = self.state["match"]
@@ -193,11 +194,25 @@ class DemoGame:
                 carrier["spike"] = True
                 self.state["match"]["spike"]["carrier"] = [carrier["team"], carrier["slot"]]
         killer["kills"] += 1
+        # The observer follows whoever gets the kill.
+        self.state["match"]["observed"] = {"team": killer["team"], "slot": killer["slot"]}
         killer["credits"] = min(9000, killer["credits"] + 200)
         killer["ult_points"] = min(killer["ult_max"], killer["ult_points"] + 1)
         mates = [p for p in self._players(killer["team"], alive=True) if p is not killer]
         if mates and self.rng.random() < 0.4:
             self.rng.choice(mates)["assists"] += 1
+
+    def _spectate(self):
+        """Someone's always spectated: a living player (a new one once the
+        one watched dies, or at the start of each round)."""
+        m = self.state["match"]
+        o = m.get("observed")
+        p = next((p for p in self._players() if o and (p["team"], p["slot"]) == (o["team"], o["slot"])), None)
+        if p is None or (not p["alive"] and m["phase"] == "combat" and self.rng.random() < 0.3):
+            alive = self._players(alive=True)
+            if alive:
+                p = self.rng.choice(alive)
+                m["observed"] = {"team": p["team"], "slot": p["slot"]}
 
     def _end_round(self, winner, how):
         m = self.state["match"]
