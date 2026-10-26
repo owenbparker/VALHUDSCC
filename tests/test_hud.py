@@ -107,6 +107,16 @@ class ServerTests(unittest.TestCase):
                 state = json.loads(urllib.request.urlopen("http://127.0.0.1:8795/api/state", timeout=5).read())
                 self.assertEqual(state["game"]["match"]["observed"], {"team": "right", "slot": 2})
                 self.assertIsNone(post("/api/ingest", {"spectating": {"text": ""}})["observed"])
+                # Swap sides: the teams, their maps won, timeouts, names, attackers and Team A.
+                post("/api/config", {"left": {"name": "Saints", "wins": 1}, "right": {"name": "Hounds"},
+                                     "maps": [{"name": "Bind", "winner": "left"}, {"name": "Haven", "winner": ""}],
+                                     "timeouts": {"left": 0, "right": 2}})
+                c = post("/api/swap", {})["config"]
+                self.assertEqual((c["left"]["name"], c["right"]["name"], c["right"]["wins"]), ("Hounds", "Saints", 1))
+                self.assertEqual([m["winner"] for m in c["maps"]], ["right", ""])
+                self.assertEqual((c["timeouts"], c["attack_first"], c["map_bans"]["team_a"]),
+                                 ({"left": 2, "right": 0}, "right", "right"))
+                self.assertEqual(c["player_names"]["right"][:2], ["Ace", "Bolt"])
                 # Side colours: the template is served recoloured.
                 css = lambda: urllib.request.urlopen("http://127.0.0.1:8795/hud/Extra.js", timeout=5).read().decode()
                 self.assertIn("'#00ffcc'", css())

@@ -397,6 +397,23 @@ class HudApp:
                 names.update(f for f in os.listdir(folder) if not f.startswith("."))
         return [f"assets/logos/{n}" for n in sorted(names)]
 
+    def swap_sides(self):
+        """The teams change sides: their names, logos, colours and series wins,
+        the maps they've won, timeouts, typed player names, who attacks first
+        and Team A in the map bans."""
+        cfg = self.config.get()
+        flip = {"left": "right", "right": "left"}
+        names = cfg.get("player_names") or {}
+        self.config.update({
+            "left": cfg["right"], "right": cfg["left"],
+            "maps": [dict(m, winner=flip.get(m.get("winner"), m.get("winner") or "")) for m in cfg.get("maps") or []],
+            "timeouts": {"left": cfg["timeouts"]["right"], "right": cfg["timeouts"]["left"]},
+            "timeout_call": flip.get(cfg.get("timeout_call"), ""),
+            "player_names": {"left": names.get("right") or [""] * 5, "right": names.get("left") or [""] * 5},
+            "attack_first": flip.get(cfg.get("attack_first"), "right"),
+            "map_bans": {"team_a": flip.get((cfg.get("map_bans") or {}).get("team_a"), "right")}})
+        log(f"Sides swapped: {cfg['right']['name'] or 'right team'} on the left")
+
     def set_network(self, enabled):
         self.config.update({"allow_network": bool(enabled)})
         if self.server:
@@ -664,6 +681,8 @@ def make_handler(app):
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if path == "/api/config":
                     app.config.update(body)
+                elif path == "/api/swap":
+                    app.swap_sides()
                 elif path == "/api/sponsor":
                     saved = app.save_sponsor(body.get("filename"), body["data"])
                     return self._send(json.dumps({"path": saved}))
