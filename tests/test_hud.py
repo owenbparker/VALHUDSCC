@@ -218,6 +218,46 @@ class ReaderTests(unittest.TestCase):
         update = read_frame(frame, known_agents={("left", 1): "Omen"})
         self.assertIn(("left", 1, "Phoenix"), update["seen_agents"])
 
+    def test_two_a_side_top_bar(self):
+        # A real 2v2 (owen's lobby): the top bar's players sit next to the
+        # score, in the left team's seats 4-5 and the right team's 1-2; the
+        # HUD shows them as each team's players 1 and 2.
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        from PIL import Image
+        from valhud.reader import Frame, health_bar
+        frame = Image.new("RGB", (1920, 1080))
+        frame.paste(Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "top_bar_2v2.png")), (598, 49))
+        f = Frame(frame)
+        players = [{"team": side, "slot": slot, "alive": health_bar(f, side, slot)[0]}
+                   for side in ("left", "right") for slot in range(1, 6)]
+        update = game.two_a_side({"source": "screen", "players": players,
+                                  "match": {"spike": {"state": "carried", "carrier": ["left", 5]}}})
+        self.assertEqual([(p["team"], p["slot"], p["alive"]) for p in update["players"]],
+                         [("left", 1, True), ("left", 2, False), ("right", 1, True), ("right", 2, True)])
+        self.assertEqual(update["match"]["spike"]["carrier"], ["left", 2])
+
+    def test_two_a_side_scoreboard(self):
+        # A 2v2's Tab scoreboard: one block of four rows, left team on top.
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        from PIL import Image, ImageDraw
+        from valhud.reader import BOARDS, Frame, scoreboard_open
+        img = Image.new("RGB", (1920, 1080), (18, 21, 24))
+        d = ImageDraw.Draw(img)
+        d.rectangle((573, 471, 1294, 538), fill=(39, 93, 84))
+        d.rectangle((573, 539, 1294, 606), fill=(74, 34, 34))
+        f = Frame(img)
+        self.assertTrue(scoreboard_open(f))
+        self.assertIs(f.board, BOARDS[2])
+        f = Frame(Image.open(os.path.join(os.path.dirname(__file__), "fixtures", "tab_scoreboard_rifles.png")))
+        self.assertTrue(scoreboard_open(f))
+        self.assertIs(f.board, BOARDS[5])
+
     def test_round_history(self):
         # Part of a real Tab scoreboard after 11 rounds (DEF 7, ATK 4), placed
         # where it sits on a 1920x1080 screen.

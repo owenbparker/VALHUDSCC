@@ -57,6 +57,26 @@ def weapon_name(text):
     return _WEAPON_LOOKUP.get(str(text or "").strip().lower(), str(text or "").strip())
 
 
+# A 2v2 on the spectator top bar: each team's two players sit next to the
+# score, in the left team's seats 4 and 5 and the right team's 1 and 2. The
+# HUD shows them as each team's players 1 and 2.
+SEATS_2V2 = {("left", 4): 1, ("left", 5): 2, ("right", 1): 1, ("right", 2): 2}
+
+
+def two_a_side(update):
+    """A screen reading (seats as on the top bar) with a 2v2's seats moved to
+    players 1 and 2 of each team, and the empty seats left out."""
+    out = dict(update)
+    if isinstance(update.get("players"), list):
+        out["players"] = [dict(p, slot=SEATS_2V2[(p.get("team"), p.get("slot"))]) for p in update["players"]
+                          if isinstance(p, dict) and (p.get("team"), p.get("slot")) in SEATS_2V2]
+    spike = (update.get("match") or {}).get("spike")
+    if isinstance(spike, dict) and spike.get("carrier"):
+        seat = SEATS_2V2.get(tuple(spike["carrier"]))
+        out["match"] = dict(update["match"], spike=dict(spike, carrier=[spike["carrier"][0], seat] if seat else None))
+    return out
+
+
 def empty_player(team, slot):
     return {"team": team, "slot": slot, "name": "", "agent": "", "alive": True, "health": 100, "shield": 0,
             "regen_shield": False, "credits": 800, "weapon": "Classic", "kills": 0, "deaths": 0, "assists": 0,

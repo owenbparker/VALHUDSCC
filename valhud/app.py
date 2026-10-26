@@ -179,6 +179,8 @@ class HudApp:
             if not update.get("match") and not update.get("players"):
                 self.refresh(fetch=False)
                 return self.observed_name()
+        if isinstance(update, dict) and update.get("source") == "screen" and self.config.get().get("team_size") == 2:
+            update = game.two_a_side(update)
         self.feed.apply(update)
         if self.mode == "live":
             self.refresh()
@@ -732,11 +734,14 @@ def make_handler(app):
                     app.overlay_window.set(bool(body.get("open")), body.get("screen"), body.get("url"))
                 elif path == "/api/reader/names":
                     names, missed = app.reader.scan_names()
+                    if app.config.get().get("team_size") == 2:
+                        names = {side: {game.SEATS_2V2[(side, seat)]: name for seat, name in seats.items()
+                                        if (side, seat) in game.SEATS_2V2} for side, seats in names.items()}
                     current = app.config.get()["player_names"]
                     new = {side: [names[side].get(i + 1) or current[side][i] for i in range(5)] for side in ("left", "right")}
                     app.config.update({"player_names": new})
                     found = sum(len(v) for v in names.values())
-                    log(f"Scanned names: {found} of 10 placed"
+                    log(f"Scanned names: {found} of {2 * (app.config.get().get('team_size') or 5)} placed"
                         + (f"; couldn't tell whose: {', '.join(missed)}" if missed else ""))
                     app.last_scan = {"found": found, "missed": missed}
                 elif path == "/api/reader/save":

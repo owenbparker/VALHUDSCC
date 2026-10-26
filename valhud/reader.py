@@ -43,6 +43,12 @@ SPIKE_ICON = (930, 24, 990, 70)    # replaces the timer once planted
 # Tab scoreboard: row tops (34px rows), left team's block then right's.
 ROW_TOP = {"left": 338, "right": 569}
 ROW_H = 34
+# The Tab scoreboard's layouts: a 5v5's two blocks of five rows, and a 2v2's
+# one block of four (left team's two on top), centred on the same line. The
+# top bar fills from the score outwards, so a 2v2's players sit in the left
+# team's seats 4 and 5 and the right team's 1 and 2 (see game.SEATS_2V2).
+BOARDS = {5: {"top": ROW_TOP, "rows": 5, "seats": {"left": [1, 2, 3, 4, 5], "right": [1, 2, 3, 4, 5]}},
+          2: {"top": {"left": 471, "right": 539}, "rows": 2, "seats": {"left": [4, 5], "right": [1, 2]}}}
 COLS = {"portrait": (573, 607), "name": (634, 812), "ult": (812, 933),
         "ult_have": (812, 867), "ult_need": (879, 933),  # either side of the "/"
         "k": (934, 973), "d": (974, 1013),
@@ -365,19 +371,28 @@ def buy_phase(frame):
 
 
 def scoreboard_open(frame):
-    """Is the Tab scoreboard on screen? Two blocks of five coloured rows:
-    usually teal above red, but both teal (or both red) at times, e.g. at
-    half time."""
-    def coloured(y0):
-        data = _pixels(frame.crop(820, y0, 930, y0 + 5 * ROW_H))
+    """Is the Tab scoreboard on screen? Two blocks of coloured rows (five a
+    team, or two in a 2v2): usually teal above red, but both teal (or both
+    red) at times, e.g. at half time. Which layout it is goes on the frame
+    (frame.board) for the cells below."""
+    def coloured(y0, rows):
+        data = _pixels(frame.crop(820, y0, 930, y0 + rows * ROW_H))
         hit = sum(1 for p in data if (p[1] > p[0] + 25 and p[1] > 60) or (p[0] > p[1] + 25 and p[0] > 60))
         return hit / max(1, len(data))
-    return coloured(ROW_TOP["left"]) > 0.6 and coloured(ROW_TOP["right"]) > 0.6
+    for board in (BOARDS[5], BOARDS[2]):
+        if all(coloured(board["top"][side], board["rows"]) > 0.6 for side in ("left", "right")):
+            frame.board = board
+            return True
+    return False
+
+
+def _row_top(frame, side):
+    return getattr(frame, "board", BOARDS[5])["top"][side]
 
 
 def row_cell(frame, side, row, col, pad=0):
     x0, x1 = COLS[col]
-    y0 = ROW_TOP[side] + ROW_H * row
+    y0 = _row_top(frame, side) + ROW_H * row
     return frame.crop(x0, y0 + pad, x1, y0 + ROW_H - pad)
 
 
@@ -392,7 +407,7 @@ def weapon_cell(frame, side, row):
     shape in the strip (the assists digits and the shield icon are narrower;
     rifles reach further right than pistols)."""
     np = _np()
-    y0 = ROW_TOP[side] + ROW_H * row
+    y0 = _row_top(frame, side) + ROW_H * row
     strip = frame.crop(WEAPON_STRIP[0], y0 + 4, WEAPON_STRIP[1], y0 + ROW_H - 4)
     cols = (np.asarray(strip.convert("L")) > 170).any(axis=0)
     runs, start, last = [], None, None
@@ -611,21 +626,23 @@ def player_name(text):
 
 
 def read_scoreboard(frame, ocr):
-    """Per row (left rows 0-4, right rows 0-4): name, ult, K/D/A, credits."""
+    """Per row (left rows 0-4, right rows 0-4; 0-1 in a 2v2): name, ult,
+    K/D/A, credits."""
     rows = {}
+    n = getattr(frame, "board", BOARDS[5])["rows"]
     # Names: whole name column per team.
     for side in ("left", "right"):
-        top = ROW_TOP[side]
+        top = _row_top(frame, side)
         x0, x1 = COLS["name"]
         # (The grey team tag before a name, "FAPP | ", is taken off after.)
-        words = ocr.words(ink(frame.crop(x0, top, x1, top + 5 * ROW_H), 2, 150))
-        for r in range(5):
+        words = ocr.words(ink(frame.crop(x0, top, x1, top + n * ROW_H), 2, 150))
+        for r in range(n):
             mine = sorted((cx, t) for t, cx, cy in words if r * ROW_H <= cy / 2 < (r + 1) * ROW_H)
             rows[(side, r)] = {"name": player_name(" ".join(t for _, t in mine))}
     # Numbers: one labelled line per player.
     h, spacing, lines, keys = ROW_H * 2, 24, [], []
     for side in ("left", "right"):
-        for r in range(5):
+        for r in range(n):
             cell = lambda c: _fit(ink(row_cell(frame, side, r, c, 3), 1, 150))
             lines.append(_line([_label("kills", h), cell("k"), _label("deaths", h), cell("d"),
                                 _label("assists", h), cell("a"), 
@@ -739,23 +756,25 @@ def seat_rows(frame, side, top_agents, known_agents=None):
     seat with the same agent. A row is only placed when that's certain (or
     it's the last row left for the last seat), so a name or loadout never
     lands on the wrong player."""
+    board = getattr(frame, "board", BOARDS[5])
+    seats = board["seats"][side]
     row_agents = {}
-    team = [a for (t, _), a in (known_agents or {}).items() if t == side]
-    for r in range(5):
+    team = [a for (t, s_), a in (known_agents or {}).items() if t == side and s_ in seats]
+    for r in range(board["rows"]):
         best = identify_agent(row_cell(frame, side, r, "portrait"), (32, 34, 36), kind="row",
-                              agents=team if len(set(team)) == 5 else None)
+                              agents=team if len(set(team)) == len(seats) else None)
         row_agents[r] = best[0][1] if clear_match(best) else None
-    free = [s_ for s_ in range(1, 6)]
+    free = list(seats)
     assign = {}
     seats_of = {}
-    for s_ in range(1, 6):
+    for s_ in seats:
         seats_of.setdefault(top_agents.get((side, s_)), []).append(s_)
     for r, agent in row_agents.items():
-        seats = [s_ for s_ in seats_of.get(agent, []) if s_ in free] if agent else []
-        if len(seats) == 1 and list(row_agents.values()).count(agent) == 1:
-            assign[r] = seats[0]
-            free.remove(seats[0])
-    left_rows = [r for r in range(5) if r not in assign]
+        match = [s_ for s_ in seats_of.get(agent, []) if s_ in free] if agent else []
+        if len(match) == 1 and list(row_agents.values()).count(agent) == 1:
+            assign[r] = match[0]
+            free.remove(match[0])
+    left_rows = [r for r in range(board["rows"]) if r not in assign]
     if len(left_rows) == 1 and len(free) == 1:
         assign[left_rows[0]] = free[0]
     return assign, row_agents
@@ -765,7 +784,7 @@ def read_name(frame, side, row, ocr):
     """One row's name, read carefully: at three contrasts, keeping the
     reading that comes up most (the longest on a tie)."""
     x0, x1 = COLS["name"]
-    y0 = ROW_TOP[side] + ROW_H * row
+    y0 = _row_top(frame, side) + ROW_H * row
     crop = frame.crop(x0, y0 + 2, x1, y0 + ROW_H - 2)
     seen = {}
     for level in (150, 120, 185):
@@ -846,7 +865,8 @@ def read_frame(image, ocr=None, known_agents=None):
                     if info.get(key) is not None:
                         p[field] = info[key]
         update["match"]["scoreboard_open"] = True
-        history = round_history(frame)
+        # (a 2v2's board has its round history somewhere else: not read yet)
+        history = round_history(frame) if frame.board is BOARDS[5] else None
         if history:
             update["match"]["rounds"] = history
     return update
@@ -1186,7 +1206,7 @@ class ScreenReader:
         names, missed = {"left": {}, "right": {}}, []
         for side in ("left", "right"):
             assign, _ = seat_rows(frame, side, top_agents, self.agents)
-            for r in range(5):
+            for r in range(frame.board["rows"]):
                 name = read_name(frame, side, r, self.ocr)
                 if r in assign and name:
                     names[side][assign[r]] = name
