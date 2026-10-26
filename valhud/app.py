@@ -362,6 +362,19 @@ class HudApp:
         if path == "/api/cam/send":
             self.cams.send(str(body.get("to") or ""), str(body.get("from") or ""), body.get("data"))
             return {"ok": True}
+        if path == "/api/cam/list":
+            # The cams connected now, for the GFX Engine's Camera Control Room.
+            with self._lock:
+                players = list(self.state["players"])
+            cfg = self.config.get()
+            cams = []
+            for p in self.cams.publishers(players):
+                who = p["player"] or {}
+                team = cfg.get(who.get("team")) or {} if who.get("team") in ("left", "right") else {}
+                cams.append({"id": p["id"], "label": p["label"], "riot_id": p["riot_id"],
+                             "team": team.get("tricode") or team.get("name") or "",
+                             "name": who.get("name") or p["riot_id"].split("#")[0]})
+            return {"game": "valorant", "cams": cams}
         return None
 
     def save_logo(self, side, filename, data_b64):
@@ -656,7 +669,7 @@ def make_handler(app):
             # change it.
             url = urlparse(self.path)
             path = url.path
-            if path in ("/api/cam/poll", "/api/cam/send"):
+            if path in ("/api/cam/poll", "/api/cam/send", "/api/cam/list"):
                 length = int(self.headers.get("Content-Length") or 0)
                 try:
                     body = json.loads(self.rfile.read(length) or b"{}")
