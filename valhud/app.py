@@ -368,12 +368,12 @@ class HudApp:
                 players = list(self.state["players"])
             cfg = self.config.get()
             cams = []
-            for p in self.cams.publishers(players):
+            for p in self.cams.all_cams(players):
                 who = p["player"] or {}
                 team = cfg.get(who.get("team")) or {} if who.get("team") in ("left", "right") else {}
                 cams.append({"id": p["id"], "label": p["label"], "riot_id": p["riot_id"],
                              "team": team.get("tricode") or team.get("name") or "",
-                             "name": who.get("name") or p["riot_id"].split("#")[0]})
+                             "name": who.get("name") or p["riot_id"].split("#")[0] or "No Riot ID yet"})
             return {"game": "valorant", "cams": cams}
         return None
 

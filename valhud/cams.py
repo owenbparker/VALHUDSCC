@@ -102,6 +102,8 @@ class CamHub:
                     self._riot.pop(peer, None)
                 if label is not None:
                     self._label[peer] = str(label)[:60]
+                elif not rid:
+                    self._label.pop(peer, None)   # (a cam leaving)
             while not self._inbox.get(peer) and time.time() < deadline:
                 self._cond.wait(deadline - time.time())
                 self._touch(peer)
@@ -128,6 +130,16 @@ class CamHub:
                 rid = self._riot.pop(p, None)
                 if rid:
                     log(f"Player cam disconnected: {rid}")
+
+    def all_cams(self, players=()):
+        """Every cam connected, with or without a Riot ID yet (the GFX Engine's
+        Camera Control Room): [{"id", "riot_id", "label", "player"}]."""
+        with self._cond:
+            now = time.time()
+            live = [(p, self._riot.get(p, ""), label) for p, label in self._label.items()
+                    if now - self._seen.get(p, 0) < GONE_AFTER]
+        matched = match_players([rid for _, rid, _ in live if rid], players)
+        return [{"id": p, "riot_id": rid, "label": label, "player": matched.get(rid)} for p, rid, label in live]
 
     def publishers(self, players=()):
         """[{"id", "riot_id", "label", "player": {"team", "slot", "name"} or None}]."""
