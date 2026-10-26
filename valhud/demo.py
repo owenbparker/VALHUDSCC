@@ -16,8 +16,9 @@ RIFLES = ["Vandal", "Phantom"]
 
 
 class DemoGame:
-    def __init__(self, speed=4.0, seed=None, attack_first="left", map_name="Ascent"):
+    def __init__(self, speed=4.0, seed=None, attack_first="left", map_name="Ascent", team_size=5):
         self.speed = speed
+        self.team_size = 2 if team_size == 2 else 5
         self.rng = random.Random(seed)
         self.attack_first = attack_first
         self.state = empty_state()
@@ -25,7 +26,7 @@ class DemoGame:
         self.state["match"]["map"] = map_name
         players = []
         for t, side in enumerate(SIDES):
-            for i in range(5):
+            for i in range(self.team_size):
                 agent = DEMO_AGENTS[t][i]
                 players.append({"team": side, "slot": i + 1, "name": DEMO_NAMES[t][i], "agent": agent,
                                 "ult_max": ULT_MAX[agent], "credits": 800})
@@ -56,8 +57,8 @@ class DemoGame:
     # --- the match --------------------------------------------------------
 
     def _players(self, side=None, alive=None):
-        return [p for p in self.state["players"]
-                if (side is None or p["team"] == side) and (alive is None or p["alive"] == alive)]
+        return [p for p in self.state["players"] if p["slot"] <= self.team_size
+                and (side is None or p["team"] == side) and (alive is None or p["alive"] == alive)]
 
     def _attackers(self, round_no):
         first, other = self.attack_first, ("right" if self.attack_first == "left" else "left")
@@ -130,7 +131,7 @@ class DemoGame:
             if m["timer"] <= 0:
                 score = m["score"]
                 if max(score.values()) >= 13 and abs(score["left"] - score["right"]) >= 2:
-                    self.__init__(self.speed, attack_first=self.attack_first, map_name=m["map"])
+                    self.__init__(self.speed, attack_first=self.attack_first, map_name=m["map"], team_size=self.team_size)
                 else:
                     self._new_round()
         self._spectate()

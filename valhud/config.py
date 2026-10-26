@@ -38,6 +38,9 @@ DEFAULTS = {
     "left": {"name": "Team Left", "tricode": "SCC", "logo": "assets/logos/scc.png", "wins": 0, "color": "#2fc7a6"},
     "right": {"name": "Team Right", "tricode": "OPP", "logo": "assets/logo_right.png", "wins": 0, "color": "#e3475a"},
     "best_of": 3,
+    # Players a team: 5, or 2 for skirmish streams (two player tabs a side,
+    # each with that player's 16:9 webcam under it).
+    "team_size": 5,
     # The HUD's two side colours (the templates' teal and red); they still
     # swap at half time. See valhud/recolor.py.
     "defense_color": "#00ffcc",

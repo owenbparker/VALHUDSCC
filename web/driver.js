@@ -143,6 +143,37 @@
     if (paths.length > 1) sponsor.timer = setInterval(next, Math.max(1, Number(seconds) || 4) * 1000);
   }
 
+  // 2v2 skirmish (config team_size 2): players 3-5 leave both pages. On the
+  // HUD the two tabs a side move up to leave room for each player's cam
+  // under their tab (web/cams.js); the scoreboard keeps its two top rows and
+  // drops down by the three rows it lost.
+  var DUO_TABS = [500, 790];   // the tabs' tops (each tab, then its cam, down to 1062)
+  function setDuo(on) {
+    document.documentElement.classList.toggle("scc-2v2", on);
+    if (document.getElementById("scc-2v2")) return;
+    var st = document.createElement("style");
+    st.id = "scc-2v2";
+    var hide = [3, 4, 5].map(function (i) { return "html.scc-2v2 .TIP" + i + ", html.scc-2v2 .TDP" + i; }).join(", ");
+    st.textContent = hide + " { display: none !important; }" + (SCOREBOARD
+      ? "html.scc-2v2 body > *, html.scc-2v2 body::before { translate: 0 167px; }" +
+        // (the panel art: cut above the third row, and its last strip filled in)
+        "html.scc-2v2 body::before { clip-path: inset(0 0 181px 0); }" +
+        "html.scc-2v2 body::after { content: ''; position: absolute; left: 0; top: 1066px; width: 1920px; height: 14px;" +
+        " background: #30323b; z-index: -1; pointer-events: none; }"
+      : DUO_TABS.map(function (top, n) {
+          return "html.scc-2v2 body > div.ScoreBoard > div.TeamIzquierda > div.TIP" + (n + 1) +
+            ", html.scc-2v2 body > div.ScoreBoard > div.TeamDerecha > div.TDP" + (n + 1) + " { top: " + top + "px; }";
+        }).join(""));
+    document.head.appendChild(st);
+  }
+
+  // The spike by its carrier's tab (the template only knows the 5v5 tabs).
+  function spikePlayer(slot, duo) {
+    SpikePlayer(slot);
+    var spike = document.getElementById("portador");
+    if (spike && duo && slot <= 2) spike.style.top = DUO_TABS[slot - 1] - 7 + "px";
+  }
+
   var WIN_CODE = { Deactivation: "1", Elimination: "2", Time: "3", Detonation: "4" };
 
   function applyState(s) {
@@ -192,8 +223,12 @@
     });
 
     // Players: team 0 is the left panel, team 1 the right; slots 1-5.
+    var duo = Number(cfg.team_size) === 2;
+    setDuo(duo);
     g.players.forEach(function (p) {
       var t = p.team === "left" ? 0 : 1, i = p.slot, k = "p" + t + i + ":";
+      // (2v2: the hidden players sort below the two on the scoreboard)
+      if (duo && i > 2) return call(k + "kda", SetPlayerKDA, [t, i, -1, 0, 0]);
       call(k + "name", SetNamePlayer, [t, i, p.name]);
       call(k + "agent", SetPlayerAgent, [t, i, p.agent || ""]);
       if (p.weapon) call(k + "weapon", SetPlayerWeapon, [t, i, p.weapon, "contain"]);
@@ -249,7 +284,7 @@
     var carrier = m.spike.carrier;
     if (m.spike.state === "carried" && carrier && m.phase !== "end") {
       call("spiketeam", SpikeTeam, [carrier[0] === "left" ? 0 : 1]);
-      call("spikeplayer", SpikePlayer, [carrier[1]]);
+      call("spikeplayer", spikePlayer, [carrier[1], duo]);
     } else {
       call("spikeplayer", SpikePlayer, [0]);
     }

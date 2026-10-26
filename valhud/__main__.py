@@ -21,7 +21,7 @@ def build_app(args):
     if args.host:
         config.update({"http_host": args.host, "allow_network": args.host == "0.0.0.0"})
     if args.demo:
-        return HudApp(config, DemoGame(speed=args.demo_speed), mode="demo")
+        return HudApp(config, DemoGame(speed=args.demo_speed, team_size=config.get().get("team_size", 5)), mode="demo")
     return HudApp(config)
 
 

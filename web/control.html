@@ -182,6 +182,7 @@
     <div class="row">
       <div><label>Best of</label><select id="best-of"><option value="1">1</option><option value="3">3</option><option value="5">5</option></select></div>
       <div><label>Attacks first</label><select id="attack-first"><option value="left">Left team</option><option value="right">Right team</option></select></div>
+      <div><label>Players</label><select id="team-size" title="2v2: two player tabs a side, each with the player's webcam under it"><option value="5">5v5</option><option value="2">2v2 skirmish</option></select></div>
     </div>
     <label>Maps (pick the one being played; set the winner when a map ends)</label>
     <div class="maps" id="maps"></div>
@@ -300,7 +301,8 @@
     <p class="note">Players run the <b>SCC Player Cam</b> app on their PC, pick VALORANT, enter this PC's address
       (<span id="cam-address">tick "Let other PCs on the network read the HUD" in Outputs</span>) and their Riot ID.
       When the observer is spectating them, their cam pops up above the bottom left of the HUD, framed in black,
-      with their name and K / D / A by a strip in their side's colour.</p>
+      with their name and K / D / A by a strip in their side's colour. In a 2v2 (Series &amp; maps &gt; Players) every
+      player's cam stays up under their tab instead, showing the team logo until their cam connects.</p>
   </section>
 
   <section class="wide" data-page="teams">
@@ -422,6 +424,7 @@ $("best-of").onchange = e => {
   post("/api/config", { best_of: n, maps, current_map: Math.min(state.config.current_map, n - 1) });
 };
 $("attack-first").onchange = e => post("/api/config", { attack_first: e.target.value });
+$("team-size").onchange = e => post("/api/config", { team_size: Number(e.target.value) });
 function renderMaps(cfg) {
   const box = $("maps");
   const key = JSON.stringify([cfg.maps, cfg.current_map, cfg.left.tricode, cfg.right.tricode]);
@@ -591,6 +594,7 @@ function apply(s) {
   if (first) loadLogos(cfg);
   setIfIdle($("best-of"), String(cfg.best_of));
   setIfIdle($("attack-first"), cfg.attack_first);
+  setIfIdle($("team-size"), String(cfg.team_size === 2 ? 2 : 5));
   renderMaps(cfg);
   applyMapBans(s);
   $("tech-pause").classList.toggle("on", cfg.tech_pause);

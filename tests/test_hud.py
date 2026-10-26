@@ -74,6 +74,18 @@ class DemoTests(unittest.TestCase):
         self.assertIn((True, "right"), sides)   # sides swap at half time
         self.assertEqual(len(m["rounds"]), m["score"]["left"] + m["score"]["right"])
 
+    def test_two_a_side(self):
+        d = DemoGame(seed=5, team_size=2)
+        for _ in range(3000):
+            d.advance(1)
+            o = d.state["match"]["observed"]
+            self.assertTrue(o is None or o["slot"] <= 2)
+            carrier = d.state["match"]["spike"]["carrier"]
+            self.assertTrue(carrier is None or carrier[1] <= 2)
+        playing = [p for p in d.state["players"] if p["kills"] or p["deaths"]]
+        self.assertTrue(playing)
+        self.assertTrue(all(p["slot"] <= 2 for p in playing))
+
 
 class ServerTests(unittest.TestCase):
     def test_ingest_and_state(self):

@@ -62,6 +62,87 @@
   (document.body || document.documentElement).appendChild(box);
   var videos = box.querySelector(".scc-videos");
 
+  // 2v2 skirmish (config team_size 2): every player's cam sits under their
+  // tab, 16:9, all the time (the pop-up cam above is left out). The
+  // spectated player's tab and cam are framed together in the template's
+  // highlight gold, round the outside, so nothing covers the cam. With no
+  // cam connected the box shows the team's logo (the demo: the agent).
+  var DUO = { tops: [500, 790], tab: 94, w: 316, h: 178, left: { left: 14, x: 14 }, right: { left: 1594, x: 1591 } };
+  var GOLD = "#d6ca97";
+  style.textContent +=
+    ".scc-duo { position: absolute; width: " + DUO.w + "px; height: " + (DUO.tab + DUO.h) + "px; pointer-events: none; display: none; }" +
+    "html.scc-2v2 .scc-duo { display: block; }" +
+    ".scc-duo .scc-duo-cam { position: absolute; left: 0; right: 0; bottom: 0; height: " + DUO.h + "px; overflow: hidden;" +
+    " background: radial-gradient(circle at 50% 40%, #2c2c34, #101014 75%); box-shadow: inset 0 0 0 1px #c3c3c3; }" +
+    ".scc-duo video { position: absolute; left: 1px; top: 0; width: calc(100% - 2px); height: calc(100% - 1px); object-fit: cover; opacity: 0; }" +
+    ".scc-duo video.on { opacity: 1; }" +
+    ".scc-duo .scc-duo-logo { position: absolute; inset: 0; background: center 46% / auto 46% no-repeat; opacity: .9; }" +
+    ".scc-duo .scc-duo-logo.agent { background-position: center bottom; background-size: auto 92%; opacity: 1; }" +
+    ".scc-duo .scc-duo-logo i { position: absolute; right: 8px; top: 6px; font: 12px Arabic, sans-serif; color: #fff9;" +
+    " letter-spacing: .1em; font-style: normal; display: none; }" +
+    ".scc-duo .scc-duo-logo.agent i { display: block; }" +
+    // The highlight: a gold line round the tab (its cut top corner too) and the cam.
+    ".scc-duo svg { position: absolute; left: 0; top: 0; overflow: visible; opacity: 0; z-index: 6;" +
+    " filter: drop-shadow(0 0 5px " + GOLD + "aa); transition: opacity .2s ease; }" +
+    ".scc-duo.right svg { transform: scaleX(-1); }" +
+    ".scc-duo.on svg { opacity: 1; }";
+
+  var duoBoxes = [];
+  function duoBoxesMade() {
+    if (duoBoxes.length) return true;
+    var homes = { left: document.getElementById("teamIzquierda"), right: document.getElementById("teamDerecha") };
+    if (!homes.left || !homes.right) return false;
+    var W = DUO.w, H = DUO.tab + DUO.h, o = 2.5;
+    // (the tab's top corner is cut from 16 px along to 21 px down)
+    var ring = [[15, -o], [W + o, -o], [W + o, H + o], [-o, H + o], [-o, 21]].map(function (p) { return p.join(","); }).join(" ");
+    ["left", "right"].forEach(function (side) {
+      [1, 2].forEach(function (slot) {
+        var el = document.createElement("div");
+        el.className = "scc-duo " + side;
+        el.style.left = DUO[side].left + "px";
+        el.style.top = DUO.tops[slot - 1] + "px";
+        el.innerHTML = '<div class="scc-duo-cam"><div class="scc-duo-logo"><i>DEMO CAM</i></div></div>' +
+          '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + " " + H + '"><polygon points="' + ring +
+          '" fill="none" stroke="' + GOLD + '" stroke-width="3" stroke-linejoin="miter"/></svg>';
+        homes[side].appendChild(el);
+        duoBoxes.push({ side: side, slot: slot, el: el, cam: el.querySelector(".scc-duo-cam"), logo: el.querySelector(".scc-duo-logo") });
+      });
+    });
+    return true;
+  }
+
+  // Moving a video pauses it.
+  function moveVideo(v, to, before) {
+    to.insertBefore(v, before || null);
+    v.play().catch(function () {});
+  }
+
+  function url(path) { return "/" + String(path || "").split("/").map(encodeURIComponent).join("/"); }
+
+  function renderDuo(s, pubs) {
+    if (!duoBoxesMade()) return;
+    var cfg = s.config, o = s.game.match.observed, demo = (s.app || {}).mode === "demo";
+    duoBoxes.forEach(function (b) {
+      var player = s.game.players.filter(function (p) { return p.team === b.side && p.slot === b.slot; })[0] || {};
+      var cam = pubs.filter(function (p) { return p.player && p.player.team === b.side && p.player.slot === b.slot; })[0];
+      var peer = cam && peers[cam.id];
+      if (peer && peer.video.parentNode !== b.cam) moveVideo(peer.video, b.cam, b.logo);
+      // (a cam no longer this player's goes back with the others)
+      Array.prototype.forEach.call(b.cam.querySelectorAll("video"), function (v) {
+        if (!peer || v !== peer.video) moveVideo(v, videos);
+      });
+      var live = !!(peer && peer.video.readyState >= 2);
+      if (peer) peer.video.classList.toggle("on", live);
+      var art = demo && player.agent
+        ? "url('/hud/Resources/Agentes/" + encodeURIComponent(player.agent) + "/" + encodeURIComponent(player.agent) + ".png')"
+        : cfg[b.side] && cfg[b.side].logo ? 'url("' + url(cfg[b.side].logo) + '")' : "none";
+      if (b.logo.dataset.art !== art) { b.logo.dataset.art = art; b.logo.style.backgroundImage = art; }
+      b.logo.classList.toggle("agent", demo && !!player.agent);
+      b.logo.style.display = live ? "none" : "";
+      b.el.classList.toggle("on", !!o && o.team === b.side && o.slot === b.slot);
+    });
+  }
+
   var peers = {};     // cam (publisher) id -> { pc, video, started }
   var registered = false;
 
@@ -167,6 +248,15 @@
       if (registered && !peers[p.id]) connect(p.id);
     });
     Object.keys(peers).forEach(function (id) { if (!wanted[id]) drop(id); });
+
+    if (Number(cfg.team_size) === 2) {
+      box.classList.remove("on");
+      return renderDuo(s, on ? pubs : []);
+    }
+    // (back from 2v2: the cams return to the pop-up box)
+    duoBoxes.forEach(function (b) {
+      Array.prototype.forEach.call(b.cam.querySelectorAll("video"), function (v) { moveVideo(v, videos); });
+    });
 
     // The spectated player, and their cam if they have one.
     var o = m.observed, player = null, cam = null;

@@ -127,7 +127,8 @@ class HudApp:
         if mode == "demo":
             maps = cfg.get("maps") or [{}]
             current = maps[min(int(cfg.get("current_map") or 0), len(maps) - 1)].get("name") or "Ascent"
-            self.source = DemoGame(speed=self.demo_speed, attack_first=cfg.get("attack_first", "left"), map_name=current)
+            self.source = DemoGame(speed=self.demo_speed, attack_first=cfg.get("attack_first", "left"), map_name=current,
+                                   team_size=cfg.get("team_size", 5))
             log(f"Demo match started ({self.demo_speed:g}x speed)")
         elif mode == "live":
             self.source = self.feed
@@ -680,7 +681,10 @@ def make_handler(app):
             try:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 if path == "/api/config":
+                    was = app.config.get().get("team_size")
                     app.config.update(body)
+                    if app.mode == "demo" and app.config.get().get("team_size") != was:
+                        app.set_mode("demo")   # the demo match again, with the new team size
                 elif path == "/api/swap":
                     app.swap_sides()
                 elif path == "/api/sponsor":
