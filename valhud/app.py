@@ -348,7 +348,7 @@ class HudApp:
                             "bo1": mapbans.steps(cfg, "bo1"), "bo3": mapbans.steps(cfg, "bo3")}
         return snap
 
-    def cam_post(self, path, body):
+    def cam_post(self, path, body, client=None):
         """Webcam messages (also from other PCs on the network)."""
         if path == "/api/cam/poll":
             result = self.cams.poll(str(body.get("id") or ""), body.get("riot_id"), body.get("label"), body.get("wait", 20))
@@ -362,7 +362,7 @@ class HudApp:
                     result["player"]["team_name"] = cfg[result["player"]["team"]]["name"]
             return result
         if path == "/api/cam/send":
-            self.cams.send(str(body.get("to") or ""), str(body.get("from") or ""), body.get("data"))
+            self.cams.send(str(body.get("to") or ""), str(body.get("from") or ""), body.get("data"), client)
             return {"ok": True}
         if path == "/api/cam/list":
             # The cams connected now, for the GFX Engine's Camera Control Room.
@@ -675,7 +675,7 @@ def make_handler(app):
                 length = int(self.headers.get("Content-Length") or 0)
                 try:
                     body = json.loads(self.rfile.read(length) or b"{}")
-                    return self._send(json.dumps(app.cam_post(path, body)))
+                    return self._send(json.dumps(app.cam_post(path, body, self.client_address[0])))
                 except (ValueError, TypeError, AttributeError) as e:
                     return self._send(json.dumps({"error": str(e)}), status=400)
             # An observer PC's screen reader sends its readings here.
