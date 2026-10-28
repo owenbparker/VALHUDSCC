@@ -239,6 +239,21 @@ class ReaderTests(unittest.TestCase):
                          [("left", 1, True), ("left", 2, False), ("right", 1, True), ("right", 2, True)])
         self.assertEqual(update["match"]["spike"]["carrier"], ["left", 2])
 
+    def test_two_a_side_round_history(self):
+        # A 2v2's history isn't read off the scoreboard: each round is added
+        # as the score goes up by one.
+        s = game.empty_state()
+        s["match"]["attackers"] = "left"
+        up = game.round_won(s, {"source": "screen", "match": {"score": {"left": 1, "right": 0}}})
+        self.assertEqual(up["match"]["rounds"], [{"winner": "left", "win_type": "Elimination"}])
+        s = game.merge(s, up)
+        s["match"]["spike"]["state"] = "planted"
+        up = game.round_won(s, {"match": {"score": {"left": 1, "right": 1}}})
+        self.assertEqual(up["match"]["rounds"][-1], {"winner": "right", "win_type": "Deactivation"})
+        # Joined mid-match (no history to add to): left alone.
+        s["match"]["score"] = {"left": 7, "right": 4}
+        self.assertNotIn("rounds", game.round_won(s, {"match": {"score": {"left": 8, "right": 4}}})["match"])
+
     def test_two_a_side_scoreboard(self):
         # A 2v2's Tab scoreboard: one block of four rows, left team on top.
         try:

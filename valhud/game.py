@@ -77,6 +77,24 @@ def two_a_side(update):
     return out
 
 
+def round_won(state, update):
+    """The update with this round added to the round history when its score
+    is one round on from the state's (for screens whose history isn't read,
+    e.g. a 2v2's Tab scoreboard). How it was won is told from the spike."""
+    m, new = state.get("match") or {}, (update.get("match") or {}).get("score")
+    if not isinstance(new, dict) or "rounds" in update["match"]:
+        return update
+    old, rounds = m.get("score") or {}, list(m.get("rounds") or [])
+    up = [side for side in SIDES if (new.get(side) or 0) == (old.get(side) or 0) + 1]
+    others = [side for side in SIDES if side not in up and (new.get(side) or 0) == (old.get(side) or 0)]
+    if len(up) != 1 or len(others) != 1 or len(rounds) != sum(old.get(side) or 0 for side in SIDES):
+        return update
+    winner, spike = up[0], (m.get("spike") or {}).get("state")
+    how = ("Detonation" if winner == m.get("attackers") else "Deactivation") if spike in ("planted", "defused", "detonated") \
+        else "Elimination"
+    return dict(update, match=dict(update["match"], rounds=rounds + [{"winner": winner, "win_type": how}]))
+
+
 def empty_player(team, slot):
     return {"team": team, "slot": slot, "name": "", "agent": "", "alive": True, "health": 100, "shield": 0,
             "regen_shield": False, "credits": 800, "weapon": "Classic", "kills": 0, "deaths": 0, "assists": 0,

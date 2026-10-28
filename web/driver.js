@@ -174,6 +174,28 @@
     if (spike && duo && slot <= 2) spike.style.top = DUO_TABS[slot - 1] - 7 + "px";
   }
 
+  // Player names on one line, made smaller to fit before the K / D / A (on
+  // the scoreboard) or the credits (on the HUD's tabs).
+  var NAME_ROOM = SCOREBOARD ? 143 : 180;
+  function setName(t, i, name) {
+    SetNamePlayer(t, i, name);
+    var el = document.querySelector(t === 0 ? ".TIP" + i + " > div.Name" : ".TDP" + i + " > div.Name2");
+    if (!el) return;
+    el.style.whiteSpace = "nowrap";
+    el.style.fontSize = "";
+    var size = parseFloat(getComputedStyle(el).fontSize) || 20;
+    // (a range measures the text itself, whatever the box's width)
+    var range = document.createRange();
+    range.selectNodeContents(el);
+    var scale = el.getBoundingClientRect().width / (el.offsetWidth || 1) || 1;   // (?fit=1 scales the page)
+    var width = range.getBoundingClientRect().width / scale;
+    if (width > NAME_ROOM) el.style.fontSize = Math.max(11, Math.floor(size * NAME_ROOM / width)) + "px";
+  }
+  // (again once the HUD's fonts have loaded: they change the widths)
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () {
+    Object.keys(sent).forEach(function (k) { if (/:name$/.test(k)) delete sent[k]; });
+  });
+
   var WIN_CODE = { Deactivation: "1", Elimination: "2", Time: "3", Detonation: "4" };
 
   function applyState(s) {
@@ -229,7 +251,7 @@
       var t = p.team === "left" ? 0 : 1, i = p.slot, k = "p" + t + i + ":";
       // (2v2: the hidden players sort below the two on the scoreboard)
       if (duo && i > 2) return call(k + "kda", SetPlayerKDA, [t, i, -1, 0, 0]);
-      call(k + "name", SetNamePlayer, [t, i, p.name]);
+      call(k + "name", setName, [t, i, p.name]);
       call(k + "agent", SetPlayerAgent, [t, i, p.agent || ""]);
       if (p.weapon) call(k + "weapon", SetPlayerWeapon, [t, i, p.weapon, "contain"]);
       else if (sent[k + "weapon"] !== "[]") {

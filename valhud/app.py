@@ -180,7 +180,7 @@ class HudApp:
                 self.refresh(fetch=False)
                 return self.observed_name()
         if isinstance(update, dict) and update.get("source") == "screen" and self.config.get().get("team_size") == 2:
-            update = game.two_a_side(update)
+            update = game.round_won(self.feed.state, game.two_a_side(update))
         self.feed.apply(update)
         if self.mode == "live":
             self.refresh()

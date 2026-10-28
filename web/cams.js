@@ -73,9 +73,12 @@
     ".scc-duo { position: absolute; width: " + DUO.w + "px; height: " + (DUO.tab + DUO.h) + "px; pointer-events: none; display: none; }" +
     "html.scc-2v2 .scc-duo { display: block; }" +
     ".scc-duo .scc-duo-cam { position: absolute; left: 0; right: 0; bottom: 0; height: " + DUO.h + "px; overflow: hidden;" +
+    " transition: filter .5s ease-in-out;" +
     " background: radial-gradient(circle at 50% 40%, #2c2c34, #101014 75%); box-shadow: inset 0 0 0 1px #c3c3c3; }" +
     ".scc-duo video { position: absolute; left: 1px; top: 0; width: calc(100% - 2px); height: calc(100% - 1px); object-fit: cover; opacity: 0; }" +
     ".scc-duo video.on { opacity: 1; }" +
+    // Dead: the cam fades to grey with the rest of their tab.
+    ".scc-duo.dead .scc-duo-cam { filter: grayscale(1); }" +
     ".scc-duo .scc-duo-logo { position: absolute; inset: 0; background: center 46% / auto 46% no-repeat; opacity: .9; }" +
     ".scc-duo .scc-duo-logo.agent { background-position: center bottom; background-size: auto 92%; opacity: 1; }" +
     ".scc-duo .scc-duo-logo i { position: absolute; right: 8px; top: 6px; font: 12px Arabic, sans-serif; color: #fff9;" +
@@ -140,6 +143,7 @@
       b.logo.classList.toggle("agent", demo && !!player.agent);
       b.logo.style.display = live ? "none" : "";
       b.el.classList.toggle("on", !!o && o.team === b.side && o.slot === b.slot);
+      b.el.classList.toggle("dead", player.alive === false);
     });
   }
 
