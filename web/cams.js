@@ -10,6 +10,9 @@
 // valhud/cams.py). Every connected cam is kept open, so switching players
 // is instant.
 //
+// A cam can be hidden from the control panel (when it isn't working): the
+// player then shows as having no cam.
+//
 // A player's cam can instead be a link (a VDO.Ninja view link, say), typed in
 // the control panel beside their Riot ID: shown in a frame, in place of
 // their Player Cam. Every link is kept loaded too.
@@ -146,7 +149,7 @@
   function seatLinks(s) {
     var out = {};
     ((s.cams || {}).links || []).forEach(function (l) {
-      var u = l.player && linkUrl(l.link);
+      var u = l.player && !l.hidden && linkUrl(l.link);
       if (u && !out[l.player.team + l.player.slot]) out[l.player.team + l.player.slot] = u;
     });
     return out;
@@ -302,7 +305,9 @@
 
   // Called by driver.js with each state; hide: the buy-phase scoreboard is up.
   window.renderCams = function (s, hide) {
-    var cfg = s.config, m = s.game.match, pubs = (s.cams || {}).publishers || [];
+    var cfg = s.config, m = s.game.match;
+    // (a cam hidden in the control panel isn't shown, or kept open)
+    var pubs = ((s.cams || {}).publishers || []).filter(function (p) { return !p.hidden; });
     var on = (cfg.cams || {}).enabled !== false;
     var links = on ? seatLinks(s) : {};
     setFonts(cfg.cams || {});

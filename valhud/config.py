@@ -66,7 +66,9 @@ DEFAULTS = {
              "name_font": "", "name_size": 18, "kda_font": "", "kda_size": 18,
              # Cam links (VDO.Ninja view links etc.), each beside the player's
              # Riot ID, which finds them in the match: [{"riot_id", "link"}].
-             "links": []},
+             "links": [],
+             # Riot IDs whose cam (link or Player Cam) is hidden, e.g. not working.
+             "hidden": []},
     # The agent select overlay (/agent-select): "pro" (the PRO Selector
     # template) or "champions" (in the Champions 2025 HUD's style).
     "agent_select": {"look": "pro"},

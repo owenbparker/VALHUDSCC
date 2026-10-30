@@ -96,6 +96,9 @@
   .cam-link-row { display: flex; gap: 8px; align-items: center; }
   .cam-link-row input { min-width: 0; padding: 6px 8px; }
   .cam-link-row .link { flex: 1; }
+  .cam-link-row .hide, .cam-list .hide { flex: 0 0 auto; padding: 4px 10px; font-size: 12px; }
+  .cam-link-row .hide.on, .cam-list .hide.on { background: #b3393955; border-color: #d55; }
+  .cam-link-row.hidden input { opacity: .45; }
   .cam-link-row .who { flex: 0 0 120px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .cam-link-row .who.ok { color: var(--accent); }
   .drop { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; }
@@ -810,7 +813,7 @@ const camLinksBox = $("cam-links");
 camLinksBox.innerHTML = `<div class="hd"><span>Riot ID</span><span>Cam link</span></div><div class="hd"><span>Riot ID</span><span>Cam link</span></div>` +
   Array.from({ length: CAM_LINK_ROWS }, (_, i) => `<div class="cam-link-row" data-i="${i}">` +
     `<input class="riot" placeholder="Name#TAG" spellcheck="false"><input class="link" placeholder="VDO.Ninja link" spellcheck="false">` +
-    `<span class="who"></span></div>`).join("");
+    `<span class="who"></span><button type="button" class="hide" title="Hide this player's cam (link or Player Cam) on the HUD, e.g. when it isn't working">Hide</button></div>`).join("");
 // "  leaf #NA1 " -> "leaf#NA1" (as the app reads it)
 const tidyRiotId = t => String(t || "").trim().replace(/\s*#\s*/, "#");
 function saveCamLinks() {
@@ -819,6 +822,23 @@ function saveCamLinks() {
   while (links.length && !links[links.length - 1].riot_id && !links[links.length - 1].link) links.pop();
   post("/api/config", { cams: { links } });
 }
+// Hide / Show a player's cam (by Riot ID): the HUD shows them with no cam.
+function setCamHidden(riotId, hide) {
+  const rid = tidyRiotId(riotId).toLowerCase();
+  if (!rid) return;
+  const hidden = ((state.config.cams || {}).hidden || []).filter(r => String(r).toLowerCase() !== rid);
+  if (hide) hidden.push(rid);
+  post("/api/config", { cams: { hidden } });
+}
+const camHidden = (s, riotId) => ((s.config.cams || {}).hidden || []).some(r => String(r).toLowerCase() === tidyRiotId(riotId).toLowerCase());
+camLinksBox.querySelectorAll(".hide").forEach(btn => btn.onclick = () => {
+  const rid = btn.closest(".cam-link-row").querySelector(".riot").value;
+  setCamHidden(rid, !camHidden(state, rid));
+});
+$("cam-list").addEventListener("click", e => {
+  const btn = e.target.closest(".hide");
+  if (btn) setCamHidden(btn.dataset.rid, !btn.classList.contains("on"));
+});
 camLinksBox.querySelectorAll("input").forEach(input => input.onchange = e => {
   if (e.target.classList.contains("riot")) e.target.value = tidyRiotId(e.target.value);
   saveCamLinks();
@@ -838,6 +858,12 @@ function applyCamLinks(s) {
       : m.player ? `${m.player.name} (${s.config[m.player.team].tricode})`
       : "not in this match yet";
     who.title = who.textContent;
+    const hidden = !!rid && camHidden(s, rid), btn = row.querySelector(".hide");
+    btn.disabled = !rid;
+    btn.classList.toggle("on", hidden);
+    btn.textContent = hidden ? "Show" : "Hide";
+    row.classList.toggle("hidden", hidden);
+    if (hidden) who.textContent = "Hidden on the HUD", who.className = "who";
   });
 }
 function applyCams(s) {
@@ -857,7 +883,8 @@ function applyCams(s) {
   const esc = t => String(t || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
   const html = pubs.length ? pubs.map(p => `<div class="cam"><b>${esc(p.riot_id)}</b><span class="note" style="margin:0">${esc(p.label)}</span>` +
       (p.player ? `<span class="who ok">${esc(p.player.name)} (${esc(cfg[p.player.team].tricode)})</span>`
-                : `<span class="who">not in this match's players yet</span>`) + `</div>`).join("")
+                : `<span class="who">not in this match's players yet</span>`) +
+      `<button type="button" class="hide${p.hidden ? " on" : ""}" data-rid="${esc(p.riot_id)}">${p.hidden ? "Show" : "Hide"}</button></div>`).join("")
     : `<div class="none">No player cams connected.</div>`;
   if ($("cam-list").dataset.html !== html) { $("cam-list").dataset.html = html; $("cam-list").innerHTML = html; }
   const host = s.app.lan_url ? s.app.lan_url.replace(/^https?:\/\//, "") : "";

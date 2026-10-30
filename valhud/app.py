@@ -338,8 +338,12 @@ class HudApp:
             players = list(self.state["players"])
             snap = {"game": self.state, "fields": self.fields, "updated_at": self.updated_at,
                     "config": self.config.get(), "output_dir": self.config.output_dir(), "app": self.app_info()}
-        snap["cams"] = {"publishers": self.cams.publishers(players),
-                        "links": cam_links((snap["config"].get("cams") or {}).get("links"), players)}
+        cc = snap["config"].get("cams") or {}
+        snap["cams"] = {"publishers": self.cams.publishers(players), "links": cam_links(cc.get("links"), players)}
+        # Cams hidden in the control panel (not working): by Riot ID.
+        hidden = {str(r).lower() for r in cc.get("hidden") or ()}
+        for c in snap["cams"]["publishers"] + snap["cams"]["links"]:
+            c["hidden"] = c["riot_id"].lower() in hidden
         snap["agent_select"] = self.agent_select.view(players)
         snap["agent_select"]["demo"] = bool(self._select_demo and self._select_demo.running())
         snap["agent_select"]["agents"] = game.AGENTS

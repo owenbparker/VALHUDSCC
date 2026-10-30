@@ -101,6 +101,12 @@ class ServerTests(unittest.TestCase):
                 state = json.loads(urllib.request.urlopen("http://127.0.0.1:8796/api/state", timeout=5).read())
                 self.assertEqual(state["cams"]["links"][0]["link"], "https://vdo.ninja/?view=grit")
                 self.assertEqual(state["cams"]["links"][0]["player"]["team"], "right")
+                self.assertFalse(state["cams"]["links"][0]["hidden"])
+                # Hidden (not working): both the link and the Player Cam.
+                post("/api/config", {"cams": {"hidden": ["grit#euw"]}})
+                state = json.loads(urllib.request.urlopen("http://127.0.0.1:8796/api/state", timeout=5).read())
+                self.assertTrue(state["cams"]["links"][0]["hidden"])
+                self.assertTrue(state["cams"]["publishers"][0]["hidden"])
                 # The Player Cam app's page posts from another origin: preflight.
                 req = urllib.request.Request("http://127.0.0.1:8796/api/cam/poll", method="OPTIONS")
                 with urllib.request.urlopen(req, timeout=5) as r:
