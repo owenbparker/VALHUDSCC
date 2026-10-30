@@ -89,6 +89,15 @@
   .cam-list .cam .who { margin-left: auto; color: var(--muted); }
   .cam-list .cam .who.ok { color: var(--accent); }
   .cam-list .none { color: var(--muted); font-size: 13px; }
+  .cam-links { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 16px; margin-bottom: 10px; }
+  @media (max-width: 900px) { .cam-links { grid-template-columns: 1fr; } }
+  .cam-links .hd { display: flex; gap: 8px; font-size: 12px; color: var(--muted); }
+  .cam-links .hd span:first-child, .cam-links .riot { flex: 0 0 150px; }
+  .cam-link-row { display: flex; gap: 8px; align-items: center; }
+  .cam-link-row input { min-width: 0; padding: 6px 8px; }
+  .cam-link-row .link { flex: 1; }
+  .cam-link-row .who { flex: 0 0 120px; font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cam-link-row .who.ok { color: var(--accent); }
   .drop { border: 2px dashed var(--line); border-radius: 8px; padding: 18px; text-align: center; color: var(--muted); cursor: pointer; }
   .drop.over { border-color: var(--accent); color: var(--text); background: rgba(49,195,146,.06); }
   .sponsor-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
@@ -297,12 +306,18 @@
       <div><label>K / D / A font</label><select id="cam-kda-font"></select>
         <label>K / D / A size <span id="cam-kda-size-val"></span></label><input type="range" id="cam-kda-size" min="10" max="32" step="1"></div>
     </div>
+    <h3>Cam links</h3>
+    <div id="cam-links" class="cam-links"></div>
+    <h3>Player Cam app</h3>
     <div id="cam-list" class="cam-list"></div>
     <p class="note">Players run the <b>SCC Player Cam</b> app on their PC, pick VALORANT, enter this PC's address
       (<span id="cam-address">tick "Let other PCs on the network read the HUD" in Outputs</span>) and their Riot ID.
       When the observer is spectating them, their cam pops up above the bottom left of the HUD, framed in black,
       with their name and K / D / A by a strip in their side's colour. In a 2v2 (Series &amp; maps &gt; Players) every
       player's cam stays up under their tab instead, showing the team logo until their cam connects.</p>
+    <p class="note">Or paste a player's <b>cam link</b> (a VDO.Ninja view link, or any page showing just their cam) beside
+      their Riot ID above. The Riot ID finds them in the match (by the name before the #), and the link takes over from
+      their Player Cam. Links work from anywhere, with a little more delay.</p>
   </section>
 
   <section class="wide" data-page="teams">
@@ -789,7 +804,44 @@ for (const [id, key] of [["cam-name-size", "name_size"], ["cam-kda-size", "kda_s
     t = setTimeout(() => post("/api/config", { cams: { [key]: Number(e.target.value) } }), 120);
   });
 }
+// Cam links: ten rows of Riot ID + link (config cams.links).
+const CAM_LINK_ROWS = 10;
+const camLinksBox = $("cam-links");
+camLinksBox.innerHTML = `<div class="hd"><span>Riot ID</span><span>Cam link</span></div><div class="hd"><span>Riot ID</span><span>Cam link</span></div>` +
+  Array.from({ length: CAM_LINK_ROWS }, (_, i) => `<div class="cam-link-row" data-i="${i}">` +
+    `<input class="riot" placeholder="Name#TAG" spellcheck="false"><input class="link" placeholder="VDO.Ninja link" spellcheck="false">` +
+    `<span class="who"></span></div>`).join("");
+// "  leaf #NA1 " -> "leaf#NA1" (as the app reads it)
+const tidyRiotId = t => String(t || "").trim().replace(/\s*#\s*/, "#");
+function saveCamLinks() {
+  const links = [...camLinksBox.querySelectorAll(".cam-link-row")].map(row => ({
+    riot_id: tidyRiotId(row.querySelector(".riot").value), link: row.querySelector(".link").value.trim() }));
+  while (links.length && !links[links.length - 1].riot_id && !links[links.length - 1].link) links.pop();
+  post("/api/config", { cams: { links } });
+}
+camLinksBox.querySelectorAll("input").forEach(input => input.onchange = e => {
+  if (e.target.classList.contains("riot")) e.target.value = tidyRiotId(e.target.value);
+  saveCamLinks();
+});
+function applyCamLinks(s) {
+  const rows = (s.config.cams || {}).links || [], matched = (s.cams || {}).links || [];
+  camLinksBox.querySelectorAll(".cam-link-row").forEach(row => {
+    const r = rows[Number(row.dataset.i)] || {}, rid = tidyRiotId(r.riot_id).toLowerCase();
+    setIfIdle(row.querySelector(".riot"), r.riot_id || "");
+    setIfIdle(row.querySelector(".link"), r.link || "");
+    const m = matched.find(l => l.riot_id.toLowerCase() === rid);
+    const who = row.querySelector(".who");
+    who.className = "who" + (m && m.player ? " ok" : "");
+    who.textContent = !rid ? (r.link ? "Enter their Riot ID" : "")
+      : !m ? "Riot ID is Name#TAG"
+      : r.link && !m.link ? "Link isn't a web address"
+      : m.player ? `${m.player.name} (${s.config[m.player.team].tricode})`
+      : "not in this match yet";
+    who.title = who.textContent;
+  });
+}
 function applyCams(s) {
+  applyCamLinks(s);
   const cc = s.config.cams || {};
   $("cams-on").checked = cc.enabled !== false;
   if (camFonts && camFonts.length) {

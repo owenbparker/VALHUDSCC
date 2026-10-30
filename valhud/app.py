@@ -17,7 +17,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 
 from . import game, mapbans, outputs, recolor
 from .agentselect import AgentSelect, AgentSelectDemo
-from .cams import CamHub
+from .cams import CamHub, cam_links
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
 from .demo import DemoGame
 from .enginelink import EngineLink, save_logo_bytes, save_sponsors
@@ -338,7 +338,8 @@ class HudApp:
             players = list(self.state["players"])
             snap = {"game": self.state, "fields": self.fields, "updated_at": self.updated_at,
                     "config": self.config.get(), "output_dir": self.config.output_dir(), "app": self.app_info()}
-        snap["cams"] = {"publishers": self.cams.publishers(players)}
+        snap["cams"] = {"publishers": self.cams.publishers(players),
+                        "links": cam_links((snap["config"].get("cams") or {}).get("links"), players)}
         snap["agent_select"] = self.agent_select.view(players)
         snap["agent_select"]["demo"] = bool(self._select_demo and self._select_demo.running())
         snap["agent_select"]["agents"] = game.AGENTS

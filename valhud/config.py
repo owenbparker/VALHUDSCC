@@ -63,7 +63,10 @@ DEFAULTS = {
     "cams": {"enabled": True,
              # The name and K / D / A under the cam: a font installed on this
              # PC ("" = the HUD's own) and its size in pixels.
-             "name_font": "", "name_size": 18, "kda_font": "", "kda_size": 18},
+             "name_font": "", "name_size": 18, "kda_font": "", "kda_size": 18,
+             # Cam links (VDO.Ninja view links etc.), each beside the player's
+             # Riot ID, which finds them in the match: [{"riot_id", "link"}].
+             "links": []},
     # The agent select overlay (/agent-select): "pro" (the PRO Selector
     # template) or "champions" (in the Champions 2025 HUD's style).
     "agent_select": {"look": "pro"},

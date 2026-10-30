@@ -5,9 +5,12 @@ enter their Riot ID (or read it from the Riot Client). Their cam connects
 straight to the HUD over the local network (WebRTC, peer to peer); this app
 only passes the connection messages between the cam and the overlays.
 
+A player's cam can also be a link (a VDO.Ninja view link, say) typed in the
+control panel beside their Riot ID; a link takes over from their Player Cam.
+
 A cam is matched to a player in the match by the name part of the Riot ID
-("leaf" of "leaf#NA1"), and the overlay shows the cam of the player the
-observer is spectating.
+("leaf" of "leaf#NA1"; the spectator screen shows no tags), and the overlay
+shows the cam of the player the observer is spectating.
 """
 
 import difflib
@@ -16,6 +19,7 @@ import re
 import threading
 import time
 import unicodedata
+from urllib.parse import urlparse
 
 from .log import log
 
@@ -64,6 +68,41 @@ def match_players(riot_ids, players):
                 taken.add(key)
                 break
     return out
+
+
+def clean_link(text):
+    """A cam link as typed ("vdo.ninja/?view=abc" or a full address) ->
+    "https://vdo.ninja/?view=abc"; "" when it isn't a web address."""
+    text = str(text or "").strip()
+    if not text:
+        return ""
+    if "://" not in text:
+        text = "https://" + text
+    try:
+        u = urlparse(text)
+    except ValueError:
+        return ""
+    return text if u.scheme in ("http", "https") and u.hostname and "." in u.hostname else ""
+
+
+def cam_links(entries, players=()):
+    """The cam links typed in the control panel, each beside a player's Riot ID
+    (config cams.links): [{"riot_id", "link", "player"}] for the rows with a
+    Riot ID, "player" being who that is in the match (or None) and "link" ""
+    when it's missing or isn't a web address."""
+    rows = []
+    for e in entries or ():
+        if not isinstance(e, dict):
+            continue
+        try:
+            rid = clean_riot_id(e.get("riot_id"))
+        except ValueError:
+            continue
+        rows.append({"riot_id": rid, "link": clean_link(e.get("link"))})
+    matched = match_players([r["riot_id"] for r in rows], players)
+    for r in rows:
+        r["player"] = matched.get(r["riot_id"])
+    return rows
 
 
 class CamHub:

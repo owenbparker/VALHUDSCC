@@ -6,7 +6,7 @@ import unittest
 import urllib.parse
 import urllib.request
 
-from valhud.cams import CamHub, clean_riot_id, match_players, name_matches
+from valhud.cams import CamHub, cam_links, clean_link, clean_riot_id, match_players, name_matches
 from valhud.config import Config
 
 
@@ -31,6 +31,26 @@ class RiotIdTests(unittest.TestCase):
         self.assertEqual(got["leaf#NA1"], {"team": "left", "slot": 2, "name": "leaf"})
         self.assertEqual(got["Timotino#100T"]["slot"], 5)
         self.assertNotIn("nobody#X", got)
+
+
+class CamLinkTests(unittest.TestCase):
+    def test_clean_link(self):
+        self.assertEqual(clean_link(" vdo.ninja/?view=abc "), "https://vdo.ninja/?view=abc")
+        self.assertEqual(clean_link("https://vdo.ninja/?view=abc"), "https://vdo.ninja/?view=abc")
+        for bad in ("", "not a link", "javascript:alert(1)", "ftp://x.com/a"):
+            self.assertEqual(clean_link(bad), "")
+
+    def test_links_found_by_riot_id(self):
+        players = [{"team": "left", "slot": 2, "name": "leaf"}, {"team": "right", "slot": 5, "name": "Timotino"}]
+        rows = cam_links([{"riot_id": "LEAF #na1", "link": "vdo.ninja/?view=leaf"},
+                          {"riot_id": "Timotino#100T", "link": "nope"},
+                          {"riot_id": "nobody#X", "link": "https://vdo.ninja/?view=x"},
+                          {"riot_id": "no tag", "link": "https://vdo.ninja/?view=y"}, "junk"], players)
+        self.assertEqual(rows[0], {"riot_id": "LEAF#na1", "link": "https://vdo.ninja/?view=leaf",
+                                   "player": {"team": "left", "slot": 2, "name": "leaf"}})
+        self.assertEqual((rows[1]["link"], rows[1]["player"]["slot"]), ("", 5))
+        self.assertIsNone(rows[2]["player"])
+        self.assertEqual(len(rows), 3)
 
 
 class HubTests(unittest.TestCase):
@@ -76,6 +96,11 @@ class ServerTests(unittest.TestCase):
                 self.assertEqual(reply["player"]["team"], "right")
                 state = json.loads(urllib.request.urlopen("http://127.0.0.1:8796/api/state", timeout=5).read())
                 self.assertEqual(state["cams"]["publishers"][0]["player"]["slot"], 2)
+                # A cam link typed beside a Riot ID in the control panel.
+                post("/api/config", {"cams": {"links": [{"riot_id": "grit#euw", "link": "vdo.ninja/?view=grit"}]}})
+                state = json.loads(urllib.request.urlopen("http://127.0.0.1:8796/api/state", timeout=5).read())
+                self.assertEqual(state["cams"]["links"][0]["link"], "https://vdo.ninja/?view=grit")
+                self.assertEqual(state["cams"]["links"][0]["player"]["team"], "right")
                 # The Player Cam app's page posts from another origin: preflight.
                 req = urllib.request.Request("http://127.0.0.1:8796/api/cam/poll", method="OPTIONS")
                 with urllib.request.urlopen(req, timeout=5) as r:

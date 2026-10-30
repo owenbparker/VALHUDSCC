@@ -9,6 +9,10 @@
 // peer to peer); the app only passes the connection messages along (see
 // valhud/cams.py). Every connected cam is kept open, so switching players
 // is instant.
+//
+// A player's cam can instead be a link (a VDO.Ninja view link, say), typed in
+// the control panel beside their Riot ID: shown in a frame, in place of
+// their Player Cam. Every link is kept loaded too.
 (function () {
   var ME = Math.random().toString(16).slice(2, 18);
   var BOX = { x: 480, y: 775, w: 300, h: 171 };   // the template's camera box (.CameraPosition)
@@ -25,6 +29,9 @@
     "#scc-cam video { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 34px);" +
     " object-fit: cover; opacity: 0; background: #3c3c46; }" +   // (a straight cut between players)
     "#scc-cam video.on { opacity: 1; }" +
+    "#scc-cam iframe { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 34px);" +
+    " border: 0; opacity: 0; background: #3c3c46; }" +
+    "#scc-cam iframe.on { opacity: 1; }" +
     // The demo's stand-in cam: the agent on a dark backdrop.
     "#scc-cam .scc-dummy { position: absolute; left: 2px; top: 2px; width: calc(100% - 4px); height: calc(100% - 34px);" +
     " display: none; background: radial-gradient(circle at 50% 35%, #4a4a58, #23232b 70%) center / cover no-repeat; }" +
@@ -77,6 +84,7 @@
     " background: radial-gradient(circle at 50% 40%, #2c2c34, #101014 75%); box-shadow: inset 0 0 0 1px #c3c3c3; }" +
     ".scc-duo video { position: absolute; left: 1px; top: 0; width: calc(100% - 2px); height: calc(100% - 1px); object-fit: cover; opacity: 0; }" +
     ".scc-duo video.on { opacity: 1; }" +
+    ".scc-duo iframe { position: absolute; left: 1px; top: 0; width: calc(100% - 2px); height: calc(100% - 1px); border: 0; }" +
     // Dead: the cam fades to grey with the rest of their tab.
     ".scc-duo.dead .scc-duo-cam { filter: grayscale(1); }" +
     ".scc-duo .scc-duo-logo { position: absolute; inset: 0; background: center 46% / auto 46% no-repeat; opacity: .9; }" +
@@ -122,19 +130,63 @@
 
   function url(path) { return "/" + String(path || "").split("/").map(encodeURIComponent).join("/"); }
 
-  function renderDuo(s, pubs) {
+  // Cam links: VDO.Ninja's fill the frame, with no on-screen controls and no
+  // sound (the cams shouldn't play into the broadcast audio).
+  function linkUrl(link) {
+    try {
+      var u = new URL(link);
+      if (/(^|\.)vdo\.ninja$|(^|\.)obs\.ninja$/.test(u.hostname)) {
+        ["cover", "cleanoutput", "noaudio"].forEach(function (p) { if (!u.searchParams.has(p)) u.searchParams.set(p, ""); });
+        return u.toString().replace(/=(&|$)/g, "$1");
+      }
+      return u.toString();
+    } catch (e) { return ""; }
+  }
+  // "left2" -> the link for that player, from their Riot ID.
+  function seatLinks(s) {
+    var out = {};
+    ((s.cams || {}).links || []).forEach(function (l) {
+      var u = l.player && linkUrl(l.link);
+      if (u && !out[l.player.team + l.player.slot]) out[l.player.team + l.player.slot] = u;
+    });
+    return out;
+  }
+  // The link frames, by where they are ("pop" or a 2v2 box) and link. (A
+  // frame reloads when moved, so each place keeps its own.)
+  var frames = {}, framesUsed = {};
+  function frame(where, parent, link, before) {
+    var key = where + "|" + link, f = frames[key];
+    if (!f) {
+      f = frames[key] = document.createElement("iframe");
+      f.allow = "autoplay; fullscreen";
+      f.src = link;
+      parent.insertBefore(f, before || null);
+    }
+    framesUsed[key] = true;
+    return f;
+  }
+  function sweepFrames() {
+    Object.keys(frames).forEach(function (k) {
+      if (!framesUsed[k]) { frames[k].remove(); delete frames[k]; }
+    });
+    framesUsed = {};
+  }
+
+  function renderDuo(s, pubs, links) {
     if (!duoBoxesMade()) return;
     var cfg = s.config, o = s.game.match.observed, demo = (s.app || {}).mode === "demo";
     duoBoxes.forEach(function (b) {
       var player = s.game.players.filter(function (p) { return p.team === b.side && p.slot === b.slot; })[0] || {};
-      var cam = pubs.filter(function (p) { return p.player && p.player.team === b.side && p.player.slot === b.slot; })[0];
+      var link = links[b.side + b.slot];
+      if (link) frame("duo" + b.side + b.slot, b.cam, link, b.logo);
+      var cam = !link && pubs.filter(function (p) { return p.player && p.player.team === b.side && p.player.slot === b.slot; })[0];
       var peer = cam && peers[cam.id];
       if (peer && peer.video.parentNode !== b.cam) moveVideo(peer.video, b.cam, b.logo);
       // (a cam no longer this player's goes back with the others)
       Array.prototype.forEach.call(b.cam.querySelectorAll("video"), function (v) {
         if (!peer || v !== peer.video) moveVideo(v, videos);
       });
-      var live = !!(peer && peer.video.readyState >= 2);
+      var live = !!link || !!(peer && peer.video.readyState >= 2);
       if (peer) peer.video.classList.toggle("on", live);
       var art = demo && player.agent
         ? "url('/hud/Resources/Agentes/" + encodeURIComponent(player.agent) + "/" + encodeURIComponent(player.agent) + ".png')"
@@ -252,6 +304,7 @@
   window.renderCams = function (s, hide) {
     var cfg = s.config, m = s.game.match, pubs = (s.cams || {}).publishers || [];
     var on = (cfg.cams || {}).enabled !== false;
+    var links = on ? seatLinks(s) : {};
     setFonts(cfg.cams || {});
     var wanted = {};
     pubs.forEach(function (p) {
@@ -265,7 +318,8 @@
 
     if (Number(cfg.team_size) === 2) {
       box.classList.remove("on");
-      return renderDuo(s, on ? pubs : []);
+      renderDuo(s, on ? pubs : [], links);
+      return sweepFrames();
     }
     // (back from 2v2: the cams return to the pop-up box)
     duoBoxes.forEach(function (b) {
@@ -273,14 +327,19 @@
     });
 
     // The spectated player, and their cam if they have one.
-    var o = m.observed, player = null, cam = null;
+    var o = m.observed, player = null, cam = null, link = "";
     if (o) {
       player = s.game.players.filter(function (p) { return p.team === o.team && p.slot === o.slot; })[0] || null;
-      cam = pubs.filter(function (p) { return p.player && p.player.team === o.team && p.player.slot === o.slot; })[0] || null;
+      link = links[o.team + o.slot] || "";
+      cam = !link && pubs.filter(function (p) { return p.player && p.player.team === o.team && p.player.slot === o.slot; })[0] || null;
     }
     var peer = cam && peers[cam.id];
-    var ready = !!(peer && peer.video.readyState >= 2);
+    var ready = !!link || !!(peer && peer.video.readyState >= 2);
     Object.keys(peers).forEach(function (id) { peers[id].video.classList.toggle("on", !!cam && id === cam.id); });
+    Object.keys(links).forEach(function (seat) {
+      frame("pop", videos, links[seat]).classList.toggle("on", links[seat] === link);
+    });
+    sweepFrames();
     // The demo match: everyone has a stand-in cam (so the cam and its
     // kill tag can be seen without real ones).
     var dummy = box.querySelector(".scc-dummy"), fake = (s.app || {}).mode === "demo" && !!player && !ready;
