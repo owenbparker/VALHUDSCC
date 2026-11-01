@@ -155,10 +155,12 @@
     st.id = "scc-2v2";
     var hide = [3, 4, 5].map(function (i) { return "html.scc-2v2 .TIP" + i + ", html.scc-2v2 .TDP" + i; }).join(", ");
     st.textContent = hide + " { display: none !important; }" + (SCOREBOARD
-      ? "html.scc-2v2 body > *, html.scc-2v2 body::before { translate: 0 167px; }" +
+      // (the whole page moves, so the rows stay on the panel art: moving
+      // the page's parts one by one moved the rows off it)
+      ? "html.scc-2v2 { translate: 0 167px; }" +
         // (the panel art: cut above the third row, and its last strip filled in)
         "html.scc-2v2 body::before { clip-path: inset(0 0 181px 0); }" +
-        "html.scc-2v2 body::after { content: ''; position: absolute; left: 0; top: 1066px; width: 1920px; height: 14px;" +
+        "html.scc-2v2 body::after { content: ''; position: absolute; left: 0; top: 899px; width: 1920px; height: 14px;" +
         " background: #30323b; z-index: -1; pointer-events: none; }"
       : DUO_TABS.map(function (top, n) {
           return "html.scc-2v2 body > div.ScoreBoard > div.TeamIzquierda > div.TIP" + (n + 1) +
@@ -176,7 +178,7 @@
 
   // Player names on one line, made smaller to fit before the K / D / A (on
   // the scoreboard) or the credits (on the HUD's tabs).
-  var NAME_ROOM = SCOREBOARD ? 143 : 180;
+  var NAME_ROOM = SCOREBOARD ? 136 : 180;
   function setName(t, i, name) {
     SetNamePlayer(t, i, name);
     var el = document.querySelector(t === 0 ? ".TIP" + i + " > div.Name" : ".TDP" + i + " > div.Name2");
