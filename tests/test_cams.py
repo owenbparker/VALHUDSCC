@@ -115,6 +115,14 @@ class ServerTests(unittest.TestCase):
                     post("/api/cam/poll", {"id": "cam2", "riot_id": "no tag", "wait": 0})
                 page = urllib.request.urlopen("http://127.0.0.1:8796/overlay", timeout=5).read()
                 self.assertIn(b"/cams.js", page)
+                # The overlay over https too (VDO.Ninja cam links on another PC's HUD window).
+                from valhud.overlay_window import secure_base
+                self.assertEqual(secure_base("http://127.0.0.1:8796"), "https://127.0.0.1:8806")
+                import ssl
+                ctx = ssl.create_default_context()
+                ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE
+                page = urllib.request.urlopen("https://127.0.0.1:8806/overlay", timeout=10, context=ctx).read()
+                self.assertIn(b"/cams.js", page)
             finally:
                 app.stop()
 

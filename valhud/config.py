@@ -26,6 +26,9 @@ DEFAULTS = {
     # A different port from the League HUD (8777), so both can run at once.
     "http_host": "127.0.0.1",
     "http_port": 8778,
+    # The same over https (0: http_port + 10, i.e. 8788), so VDO.Ninja cam
+    # links play in the Observer Client's HUD window on another PC.
+    "https_port": 0,
     # Let other PCs on your network read the overlay and data (changes can
     # still only be made on this PC).
     "allow_network": False,

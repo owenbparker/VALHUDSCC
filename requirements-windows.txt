@@ -1,6 +1,8 @@
 # Desktop app extras (Windows). The HUD itself only needs Python's standard library.
 pywebview
 pillow
+# The https certificate (VDO.Ninja cam links on the Observer Client's HUD window).
+cryptography
 # Reading the spectator screen: image matching and Windows text recognition.
 numpy
 winrt-runtime

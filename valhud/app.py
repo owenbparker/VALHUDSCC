@@ -7,6 +7,7 @@ import mimetypes
 import os
 import re
 import socket
+import ssl
 import subprocess
 import sys
 import threading
@@ -331,7 +332,8 @@ class HudApp:
                 "feed": self.feed.info(), "reader": self.reader.info(), "update": self.updater.info(),
                 "scan": getattr(self, "last_scan", None),
                 "overlay_window": self.overlay_window.info() if self.overlay_window else {"available": False},
-                "lan_url": f"http://{lan}:{port}" if lan else None, "data_dir": DATA_DIR}
+                "lan_url": f"http://{lan}:{port}" if lan else None, "data_dir": DATA_DIR,
+                "https_port": self.server.https_port if self.server and self.server.httpsd else None}
 
     def snapshot(self):
         with self._lock:
@@ -773,12 +775,32 @@ def make_handler(app):
     return Handler
 
 
-class Server:
-    """The HTTP server in a background thread; can be restarted on a new host."""
+class TlsServer(ThreadingHTTPServer):
+    """The same server over https (for VDO.Ninja cam links on another PC's
+    HUD window). The handshake happens in each connection's own thread, so a
+    slow one holds nothing up."""
 
-    def __init__(self, app, host, port):
-        self.app, self.port = app, port
-        self.httpd = None
+    daemon_threads = True
+
+    def __init__(self, address, handler, context):
+        self.context = context
+        super().__init__(address, handler)
+
+    def finish_request(self, request, client_address):
+        try:
+            request = self.context.wrap_socket(request, server_side=True)
+        except (ssl.SSLError, OSError):
+            return  # e.g. a browser turning down the certificate
+        super().finish_request(request, client_address)
+
+
+class Server:
+    """The HTTP server (and its https twin) in background threads; can be
+    restarted on a new host."""
+
+    def __init__(self, app, host, port, https_port=None):
+        self.app, self.port, self.https_port = app, port, https_port
+        self.httpd = self.httpsd = None
         self._start(host)
 
     def _start(self, host):
@@ -786,24 +808,35 @@ class Server:
         self.httpd.daemon_threads = True
         threading.Thread(target=self.httpd.serve_forever, daemon=True).start()
         self.host = host
+        self.httpsd = None
+        if self.https_port:
+            try:
+                from .tls import server_context
+                context = server_context(os.path.join(DATA_DIR, "certs"), ["localhost", "127.0.0.1", lan_ip()])
+                if context:
+                    self.httpsd = TlsServer((host, self.https_port), make_handler(self.app), context)
+                    threading.Thread(target=self.httpsd.serve_forever, daemon=True).start()
+            except Exception as e:  # the HUD works without it; only cam links on other PCs need it
+                log(f"Couldn't start https on port {self.https_port} ({e}); cam links won't show on other PCs", "warn")
 
     def restart(self, host):
         if host == self.host:
             return
-        old = self.httpd
-        old.shutdown()
-        old.server_close()
+        self.stop()
         self._start(host)
 
     def stop(self):
-        self.httpd.shutdown()
-        self.httpd.server_close()
+        for server in (self.httpd, self.httpsd):
+            if server:
+                server.shutdown()
+                server.server_close()
 
 
 def start(app):
     """Start the web server and the game poller. Raises OSError if the port is taken."""
-    port = app.config.get()["http_port"]
-    app.server = Server(app, app.host(), port)
+    cfg = app.config.get()
+    port = cfg["http_port"]
+    app.server = Server(app, app.host(), port, cfg.get("https_port") or port + 10)
     if app.config.get().get("screen_reader"):
         app.reader.set_enabled(True)
     clean_up_old_update()
