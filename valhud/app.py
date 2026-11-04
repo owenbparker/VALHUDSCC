@@ -61,7 +61,8 @@ class HudApp:
         # The SCC GFX Engine: the game and series go to it; its teams can come here.
         self.engine = EngineLink("VALORANT HUD", "valorant", self._engine_snapshot, self._engine_apply_global,
                                  load=lambda: self.config.get().get("gfx_engine"),
-                                 save=lambda d: self.config.update({"gfx_engine": d}), log=log)
+                                 save=lambda d: self.config.update({"gfx_engine": d}), log=log,
+                                 swap=lambda: self.swap_sides(engine=False))
         self._was_connected = None
         self._last_round = None
         # The observer client's reading of who it's spectating:
@@ -420,7 +421,7 @@ class HudApp:
                 names.update(f for f in os.listdir(folder) if not f.startswith("."))
         return [f"assets/logos/{n}" for n in sorted(names)]
 
-    def swap_sides(self):
+    def swap_sides(self, engine=True):
         """The teams change sides: their names, logos, colours and series wins,
         the maps they've won, timeouts, typed player names, who attacks first
         and Team A in the map bans."""
@@ -436,6 +437,8 @@ class HudApp:
             "attack_first": flip.get(cfg.get("attack_first"), "right"),
             "map_bans": {"team_a": flip.get((cfg.get("map_bans") or {}).get("team_a"), "right")}})
         log(f"Sides swapped: {cfg['right']['name'] or 'right team'} on the left")
+        if engine:   # (connected: the GFX Engine's Global teams swap too, as the HUD follows them)
+            self.engine.swap_global()
 
     def set_network(self, enabled):
         self.config.update({"allow_network": bool(enabled)})

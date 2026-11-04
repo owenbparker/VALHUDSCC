@@ -411,7 +411,7 @@ class EngineLinkTests(unittest.TestCase):
                 body = ingests[-1]
                 self.assertEqual(body["source"], "VALORANT HUD")
                 self.assertEqual(body["game"], "valorant")
-                self.assertEqual(body["series"]["left"]["short"], "SCC")
+                self.assertEqual(body["series"]["left"], {"score": 0})   # (never its teams: Global has those)
                 self.assertEqual(body["series"]["best_of"], 3)
                 self.assertIn("TEAM LEFT", body["fields"])
                 self.assertIn("LEFT P1 AGENT", body["fields"])
