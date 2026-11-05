@@ -249,6 +249,7 @@ def fields(state, cfg):
         f[f"{k} K"] = p["kills"]
         f[f"{k} D"] = p["deaths"]
         f[f"{k} A"] = p["assists"]
+        f[f"{k} FK"] = p.get("first_kills", 0)   # (first kills, counted by valhud/series.py)
         f[f"{k} ULT"] = f"{p['ult_points']}/{p['ult_max']}"
         f[f"{k} AGENT IMAGE"] = f"hud/Resources/Agentes/{p['agent']}/{p['agent']}.png" if p["agent"] else ""
     return f

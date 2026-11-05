@@ -57,6 +57,9 @@ class Series:
         self._bans = None
         self._round = None
         self._round_kills = {}     # (team, slot) -> kills at the start of the round
+        self.first_kills = {}      # (team, slot) -> rounds they got the first kill in, this map
+        self._fk_round = None      # the round whose first kill's been given (or seen too late to tell)
+        self._round_n = 0          # counts each new round / buy phase (round_kills starts again)
 
     # --- Map Bans -> maps -----------------------------------------------------
 
@@ -97,12 +100,33 @@ class Series:
         key = (m.get("round"), m.get("phase") == "buy")
         if key != self._round:
             self._round = key
+            self._round_n += 1
             self._round_kills = {(p["team"], p["slot"]): p["kills"] for p in state["players"]}
         for p in state["players"]:
             start = self._round_kills.get((p["team"], p["slot"]))
             if start is None or p["kills"] < start:
                 self._round_kills[(p["team"], p["slot"])] = start = p["kills"]
             p["round_kills"] = max(0, p["kills"] - start) if m.get("phase") != "buy" else 0
+        self._first_kill(state)
+
+    def _first_kill(self, state):
+        """First kills: the player who gets the round's first kill (the first
+        one whose kills go up after the buy phase). Two at once (between two
+        reads) can't be told apart, so that round counts for neither. A new
+        map (everyone back to 0 kills) starts the count again."""
+        m, players = state["match"], state["players"]
+        if not any(p["kills"] for p in players):
+            self.first_kills, self._fk_round = {}, None
+        rnd = self._round_n   # (round_kills counts from the start of this one)
+        if m.get("phase") != "buy" and self._fk_round != rnd:
+            got = [p for p in players if p.get("round_kills")]
+            if got:
+                self._fk_round = rnd
+                if len(got) == 1 and got[0]["round_kills"] == 1:
+                    seat = (got[0]["team"], got[0]["slot"])
+                    self.first_kills[seat] = self.first_kills.get(seat, 0) + 1
+        for p in players:
+            p["first_kills"] = self.first_kills.get((p["team"], p["slot"]), 0)
 
     def watch(self, state, fields):
         """A live state: a won map is recorded. Returns the state to show

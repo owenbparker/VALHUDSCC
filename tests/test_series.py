@@ -86,6 +86,38 @@ class SeriesTests(unittest.TestCase):
         self.series.round_kills(s)
         self.assertEqual(s["players"][0]["round_kills"], 0)
 
+    def test_first_kills(self):
+        s = state(0, 0)
+        p1, p6 = s["players"][0], s["players"][5]
+
+        def step(phase, k1=None, k6=None, rnd=None):
+            s["match"]["phase"] = phase
+            if rnd is not None:
+                s["match"]["round"] = rnd
+            if k1 is not None:
+                p1["kills"] = k1
+            if k6 is not None:
+                p6["kills"] = k6
+            self.series.round_kills(s)
+            return game.fields(s, self.cfg.get())
+
+        step("buy", rnd=1)
+        step("combat")
+        step("combat", k6=1)                # round 1: right player 1 first
+        step("combat", k1=1, k6=2)          # (more kills: not first)
+        f = step("buy", rnd=2)
+        self.assertEqual((p1["first_kills"], p6["first_kills"]), (0, 1))
+        step("combat")
+        f = step("combat", k1=2)            # round 2: left player 1 first
+        step("combat", k6=3)
+        self.assertEqual((f["LEFT P1 FK"], f["RIGHT P1 FK"]), (1, 1))
+        step("buy", rnd=3)
+        step("combat", k1=3, k6=4)          # two between reads: can't tell, nobody's
+        f = step("buy", rnd=4)
+        self.assertEqual((f["LEFT P1 FK"], f["RIGHT P1 FK"]), (1, 1))
+        f = step("buy", rnd=1, k1=0, k6=0)  # a new map
+        self.assertEqual((f["LEFT P1 FK"], f["RIGHT P1 FK"]), (0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()
