@@ -122,7 +122,8 @@
   // Sponsors (top right): the logos saved in the control panel, in turn
   // (the template's own two until some are saved).
   if (!SCOREBOARD && typeof SponsorTimer !== "undefined") clearInterval(SponsorTimer);
-  var sponsor = { key: "", i: 0, timer: null };
+  var sponsor = { key: "", i: 0, timer: null, swap: null };
+  var SPONSOR_FADE = 400;   // ms each way
   function setSponsors(list, seconds) {
     var logo = document.querySelector(".SponsorsLogo"), box = document.querySelector(".Sponsors");
     if (SCOREBOARD || !logo) return;
@@ -134,12 +135,22 @@
     sponsor.i = 0;
     clearInterval(sponsor.timer);
     if (box) box.style.display = "block";
-    Object.assign(logo.style, { backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center" });
-    function next() {
+    // Each logo fades out, then the next fades in (the template's CSS
+    // transition on every property cross-blended one logo into the next).
+    Object.assign(logo.style, { backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center",
+                                transition: "opacity " + SPONSOR_FADE + "ms ease", opacity: "1" });
+    paths.forEach(function (p) { new Image().src = p; });   // loaded before their turn
+    function show() {
       logo.style.backgroundImage = 'url("' + paths[sponsor.i % paths.length] + '")';
       sponsor.i++;
     }
-    next();
+    function next() {
+      logo.style.opacity = "0";
+      clearTimeout(sponsor.swap);
+      sponsor.swap = setTimeout(function () { show(); logo.style.opacity = "1"; }, SPONSOR_FADE);
+    }
+    clearTimeout(sponsor.swap);
+    show();
     if (paths.length > 1) sponsor.timer = setInterval(next, Math.max(1, Number(seconds) || 4) * 1000);
   }
 
