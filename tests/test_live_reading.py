@@ -103,3 +103,19 @@ class LiveKdaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShieldTests(unittest.TestCase):
+    def test_light_heavy_and_regen(self):
+        from PIL import Image, ImageDraw
+        from valhud import reader
+        frame = reader.Frame(Image.open(os.path.join(FIXTURES, "tab_scoreboard_rifles.png")))
+        self.assertTrue(reader.scoreboard_open(frame))
+        cell = lambda side, row: reader.row_cell(frame, side, row, "shield", 4)
+        self.assertEqual(reader.shield_reading(cell("left", 0)), (50, False))   # filled, with wings
+        self.assertEqual(reader.shield_reading(cell("left", 1)), (25, False))   # outline
+        # Another icon (the regen shield's): 25 that regenerates.
+        other = Image.new("RGB", (34, 26), (40, 90, 80))
+        ImageDraw.Draw(other).ellipse((9, 3, 25, 22), outline=(255, 255, 255), width=3)
+        self.assertEqual(reader.shield_reading(other), (25, True))
+        self.assertEqual(reader.shield_reading(Image.new("RGB", (34, 26), (40, 90, 80))), (0, False))

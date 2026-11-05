@@ -428,13 +428,51 @@ def weapon_cell(frame, side, row):
     return strip.crop((a, 0, b + 1, strip.height))
 
 
+_shield_refs = None
+
+
+def _shield_ink(img):
+    np = _np()
+    return np.asarray(img.convert("L"), dtype=np.float32) > 170
+
+
+def _overlap(a, b, m=3):
+    """How well two icons' white shapes overlap (intersection over union),
+    the best within m px either way."""
+    H, W = a.shape
+    best = 0.0
+    for dy in range(-m, m + 1):
+        for dx in range(-m, m + 1):
+            A = a[max(0, dy):H + min(0, dy), max(0, dx):W + min(0, dx)]
+            B = b[max(0, -dy):H + min(0, -dy), max(0, -dx):W + min(0, -dx)]
+            union = (A | B).sum()
+            if union:
+                best = max(best, float((A & B).sum()) / float(union))
+    return best
+
+
+def shield_reading(cell):
+    """(points, regen) from the shield icon next to the weapon: no icon 0;
+    the outlined shield light (25); the filled one with wings heavy (50);
+    a shield icon that's neither is the regen shield (25, regenerating).
+    Matched against real icons (web/reader_refs/shield-light/heavy.png)."""
+    global _shield_refs
+    from PIL import Image
+    if _bright(cell, 170) < 0.04:
+        return 0, False
+    if _shield_refs is None:
+        _shield_refs = {k: _shield_ink(Image.open(os.path.join(REFS_DIR, f"shield-{k}.png"))) for k in ("light", "heavy")}
+    ink = _shield_ink(cell.resize(_shield_refs["light"].shape[::-1]) if cell.size != _shield_refs["light"].shape[::-1] else cell)
+    scores = {k: _overlap(ink, ref) for k, ref in _shield_refs.items()}
+    kind = max(scores, key=scores.get)
+    if scores[kind] < 0.6:
+        return 25, True
+    return (50 if kind == "heavy" else 25), False
+
+
 def shield_level(cell):
-    """0 / 25 / 50 from the shield icon next to the weapon (none: no icon).
-    Bigger, filled icon = heavy shield (calibrate with real frames)."""
-    lit = _bright(cell, 170)
-    if lit < 0.04:
-        return 0
-    return 50 if lit > 0.22 else 25
+    """0 / 25 / 50 (see shield_reading)."""
+    return shield_reading(cell)[0]
 
 
 # --- text ---------------------------------------------------------------------
@@ -855,7 +893,7 @@ def read_frame(image, ocr=None, known_agents=None):
                     p["weapon"] = weapon
                 elif cell is None:
                     p["weapon"] = ""   # empty loadout: no gun (don't keep last round's)
-                p["shield"] = shield_level(row_cell(frame, side, r, "shield", 4))
+                p["shield"], p["regen_shield"] = shield_reading(row_cell(frame, side, r, "shield", 4))
                 info = board.get((side, r)) or {}
                 if info.get("name"):
                     p["name"] = info["name"]
