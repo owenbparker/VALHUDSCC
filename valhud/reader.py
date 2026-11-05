@@ -1403,6 +1403,7 @@ class SelectTracker:
         self.seen_at = 0.0
         self.empty_since = 0.0
         self._names = {}
+        self._layout = None   # where the cards are (selectreader.Layout), kept while VALORANT runs
         self._steady = {}
         self._pending = {}
         self._lock = threading.Lock()
@@ -1416,7 +1417,9 @@ class SelectTracker:
         from . import selectreader
         with self._lock:
             self.checked_at = time.time()
-            reading = selectreader.read(image, ocr, self._names)
+            if self._layout is None:
+                self._layout = selectreader.Layout()
+            reading = selectreader.read(image, ocr, self._names, self._layout)
             if reading is None:
                 if not self.active:
                     return False

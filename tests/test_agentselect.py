@@ -94,10 +94,6 @@ class ServerTests(unittest.TestCase):
                 app.stop()
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 FIXTURES = os.path.join(os.path.dirname(__file__), "fixtures", "agent_select")
 
 
@@ -241,3 +237,45 @@ class NamesFromAgentSelectTests(unittest.TestCase):
             by = {(p["team"], p["slot"]): p["name"] for p in app.state["players"]}
             self.assertEqual(by[("left", 4)], "Gora46")      # its seat in the match, by agent
             self.assertEqual(by[("right", 1)], "Typed")      # a typed name wins
+
+
+class ShiftedCardsTests(unittest.TestCase):
+    """Cards a little off where the reader expects (another resolution, a
+    game update): owen's Lotus agent select read only Omen a side."""
+
+    @staticmethod
+    def moved(name, scale, dx, dy):
+        from PIL import Image
+        im = Image.open(os.path.join(FIXTURES, name + ".webp")).convert("RGB").resize((1920, 1080))
+        out = im.copy()
+        for x0, x1, sign in ((0, 500, 1), (1420, 1920, -1)):
+            col = im.crop((x0, 0, x1, 1080)).resize((round((x1 - x0) * scale), round(1080 * scale)))
+            bg = Image.new("RGB", (x1 - x0, 1080), (70, 90, 90))
+            bg.paste(col, (round(960 + (x0 - 960) * scale + dx * sign) - x0, round(540 - 540 * scale + dy)))
+            out.paste(bg.crop((0, 150, x1 - x0, 1080)), (x0, 150))
+        return out
+
+    def test_cards_found_when_moved(self):
+        from valhud import selectreader
+        expected = [(p["agent"], p["locked"]) for p in selectreader.read(
+            self.moved("mixed_38", 1, 0, 0))["players"]]
+        for scale, dx, dy in ((1, 0, 10), (1, -30, 25), (0.95, -5, 8), (1.05, 0, 0)):
+            layout = selectreader.Layout()
+            reading = selectreader.read(self.moved("mixed_38", scale, dx, dy), layout=layout)
+            self.assertEqual([(p["agent"], p["locked"]) for p in reading["players"]], expected, (scale, dx, dy))
+            self.assertAlmostEqual(layout.s, scale, delta=0.01)
+            self.assertAlmostEqual(layout.dy, dy, delta=3)
+            # Kept for the next frame: no search needed.
+            again = selectreader.read(self.moved("mixed_38", scale, dx, dy), layout=layout)
+            self.assertEqual(again["players"], reading["players"])
+
+    def test_no_search_on_empty_cards(self):
+        from PIL import Image
+        from valhud import selectreader
+        layout = selectreader.Layout()
+        selectreader.read(Image.open(os.path.join(FIXTURES, "empty_70_taskbar.webp")), layout=layout)
+        self.assertEqual(layout.searched_at, 0.0)
+
+
+if __name__ == "__main__":
+    unittest.main()
