@@ -1174,16 +1174,17 @@ class ScreenReader:
         the app), at most one every 30 s and 20 a run: send them in to have
         the reader taught that screen."""
         now = time.time()
-        if now - getattr(self, "_kept_at", 0) < self.KEEP_EVERY or getattr(self, "_kept", 0) >= self.KEEP_MAX:
+        kept_at = self.__dict__.setdefault("_kept_at", {})
+        if now - kept_at.get(why, 0) < self.KEEP_EVERY or getattr(self, "_kept", 0) >= self.KEEP_MAX:
             return
-        self._kept_at, self._kept = now, getattr(self, "_kept", 0) + 1
+        kept_at[why], self._kept = now, getattr(self, "_kept", 0) + 1
         try:
             from .config import DATA_DIR
             folder = os.path.join(DATA_DIR, "frames", "auto")
             os.makedirs(folder, exist_ok=True)
             path = os.path.join(folder, time.strftime(f"%Y%m%d-%H%M%S-{why}.png"))
             image.save(path)
-            log(f"Saved a frame the reader couldn't read: {path}")
+            log(f"Problem frame saved ({why}): {os.path.basename(path)}", "warn")
         except OSError:
             pass
 
@@ -1346,6 +1347,8 @@ class ScreenReader:
                         self.kda = LiveKda()
                     if self.select.empty_for() > 20:
                         self._keep_frame(image, "agent-select-unread")
+                    elif self.select.unread_for() > 8:
+                        self._keep_frame(image, "agent-select-cards-unread")
                 elif image is not None and attacking_side(Frame(image)) is None:
                     # Neither agent select nor the match's top bar: a screen
                     # the reader doesn't know (kept, a few, for tuning it).
@@ -1402,11 +1405,16 @@ class SelectTracker:
         self.checked_at = 0.0
         self.seen_at = 0.0
         self.empty_since = 0.0
+        self.unread_since = 0.0   # a card with a portrait no agent matches, since
         self._names = {}
         self._layout = None   # where the cards are (selectreader.Layout), kept while VALORANT runs
         self._steady = {}
         self._pending = {}
         self._lock = threading.Lock()
+
+    def unread_for(self):
+        """Seconds a card's shown a portrait the reader can't name."""
+        return time.time() - self.unread_since if self.active and self.unread_since else 0.0
 
     def empty_for(self):
         """Seconds agent select's been on screen with no agent read on any card."""
@@ -1443,6 +1451,10 @@ class SelectTracker:
                 self.empty_since = 0.0
             elif not self.empty_since:
                 self.empty_since = time.time()
+            if not reading.pop("unread", 0):
+                self.unread_since = 0.0
+            elif not self.unread_since:
+                self.unread_since = time.time()
             for p in reading["players"]:
                 key, value = (p["team"], p["slot"]), (p["agent"], p["locked"])
                 if key not in self._steady or self._pending.get(key) == value:

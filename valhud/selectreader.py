@@ -422,6 +422,10 @@ def read(image, ocr=None, names=None, layout=None):
                             "from the usual place")
                     except Exception:
                         pass
+    # Cards still showing a portrait no agent matched (kept as a problem frame
+    # by the reader when it lasts).
+    reading["unread"] = sum(1 for (side, row), agent in cards.items()
+                            if not agent and has_portrait(frame, side, row, layout))
     for side in SIDES:
         for row in range(5):
             agent = cards[(side, row)]

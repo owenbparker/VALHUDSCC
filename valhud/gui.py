@@ -78,6 +78,9 @@ def main():
     parser.add_argument("--overlay-test", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
+    from . import log as applog
+    from .config import DATA_DIR
+    applog.set_folder(os.path.join(DATA_DIR, "frames", "auto"))   # (the day's log, for problem reports)
     app = build_app(args)
     port = app.config.get()["http_port"]
     own_server = True

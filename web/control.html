@@ -341,7 +341,8 @@
     <div class="note" id="reader-status" style="margin:8px 0 10px"></div>
     <div class="row" style="margin-bottom:10px">
       <button id="reader-save" style="flex:0 0 auto" title="Saves the VALORANT screen as the reader sees it, with what it read, to the frames folder (to send for tuning)">Save frame</button>
-      <span class="note" style="margin:0">Something read wrong? Save a frame at that moment (with the Tab scoreboard open, too) and send the files from the folder that opens.</span>
+      <button id="reader-report" style="flex:0 0 auto" title="Zips everything to send in after a show: the frames the reader saved by itself when it couldn't read something, your saved frames and the log">Problem report</button>
+      <span class="note" style="margin:0">Something read wrong? Save a frame at that moment. The reader also saves one by itself when it can't read a screen. After the show, press Problem report and send the zip from the folder that opens.</span>
     </div>
     <div class="feed" id="feed"></div>
     <details class="note" style="margin-top:8px">
@@ -537,6 +538,7 @@ function applySponsors(cfg) {
 }
 
 $("reader-save").onclick = () => post("/api/reader/save", {});
+$("reader-report").onclick = () => post("/api/report", {});
 $("scan-names").onclick = async () => {
   $("scan-names").disabled = true;
   $("scan-result").textContent = "Scanning…";

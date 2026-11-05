@@ -452,6 +452,31 @@ class HudApp:
         cfg = self.config.get()
         return "0.0.0.0" if cfg.get("allow_network") else cfg["http_host"]
 
+    def problem_report(self):
+        """One zip to send in after a show: the frames the reader saved by
+        itself when it couldn't read something (frames/auto), the frames saved
+        with Save frame, the logs, and what the HUD has now (no config: it
+        can hold cam links). Saved in frames/, returns its path."""
+        import zipfile
+        folder = os.path.join(DATA_DIR, "frames")
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, time.strftime("problem-report-%Y%m%d-%H%M%S.zip"))
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
+            for root, _, files in os.walk(folder):
+                for name in sorted(files):
+                    if name.startswith("problem-report-"):
+                        continue
+                    full = os.path.join(root, name)
+                    z.write(full, os.path.relpath(full, folder))
+            with self._lock:
+                state = json.loads(json.dumps(self.state, default=str))
+            from .version import VERSION
+            z.writestr("state-now.json", json.dumps({"version": VERSION, "mode": self.mode, "state": state,
+                                                     "agent_select": self.agent_select.view([])}, indent=1))
+            z.writestr("log-recent.txt", "\n".join(f"[{e['time']}] {e['level'].upper():5} {e['message']}" for e in since(0)))
+        log(f"Problem report saved: {os.path.basename(path)}")
+        return path
+
     def open_folder(self, which):
         folders = {"output": self.config.output_dir(), "logos": LOGO_DIR, "app": DATA_DIR, "sponsors": SPONSOR_DIR,
                    "frames": os.path.join(DATA_DIR, "frames")}
@@ -756,6 +781,9 @@ def make_handler(app):
                     log(f"Scanned names: {found} of {2 * (app.config.get().get('team_size') or 5)} placed"
                         + (f"; couldn't tell whose: {', '.join(missed)}" if missed else ""))
                     app.last_scan = {"found": found, "missed": missed}
+                elif path == "/api/report":
+                    app.problem_report()
+                    app.open_folder("frames")
                 elif path == "/api/reader/save":
                     saved = app.reader.save_frame(os.path.join(DATA_DIR, "frames"))
                     log(f"Saved the screen and what was read from it: {saved}")

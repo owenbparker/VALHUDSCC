@@ -269,6 +269,12 @@ class ShiftedCardsTests(unittest.TestCase):
             again = selectreader.read(self.moved("mixed_38", scale, dx, dy), layout=layout)
             self.assertEqual(again["players"], reading["players"])
 
+    def test_unread_cards_counted(self):
+        from valhud import selectreader
+        self.assertEqual(selectreader.read(self.moved("locked_00", 1, 0, 0))["unread"], 0)
+        # Pushed half off the screen: portraits there, no agent read (kept as a problem frame).
+        self.assertGreater(selectreader.read(self.moved("locked_00", 1.15, 0, 0), layout=selectreader.Layout())["unread"], 0)
+
     def test_no_search_on_empty_cards(self):
         from PIL import Image
         from valhud import selectreader
