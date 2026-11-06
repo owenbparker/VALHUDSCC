@@ -20,6 +20,10 @@ if sys.platform == "win32":
     # Windows text recognition (reading the spectator screen).
     d, b, h = collect_all("winrt")
     datas, binaries, hidden = datas + d, binaries + b, hidden + h
+    # Capture off the graphics card (when the ordinary screen copy is black).
+    for pkg in ("dxcam", "comtypes"):
+        d, b, h = collect_all(pkg)
+        datas, binaries, hidden = datas + d, binaries + b, hidden + h
 
 a = Analysis(
     [os.path.join(root, "ValorantHUD.py")],

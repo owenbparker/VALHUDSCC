@@ -59,6 +59,18 @@ def smoke_test(port):
     except Exception as e:
         ok = False
         results.append(f"FAIL window library: {e!r}")
+    if sys.platform == "win32":
+        # The graphics card capture (for PCs where the screen copy is black)
+        # must be packaged; whether this machine can use it is just noted.
+        try:
+            import dxcam  # noqa: F401
+            from .reader import _dxgi_grab, CAPTURE
+            img = _dxgi_grab((0, 0, 64, 64))
+            results.append("OK   graphics card capture packaged"
+                           + (f" (grabbed {img.size})" if img is not None else f" (not usable here: {CAPTURE['dxgi_error']})"))
+        except Exception as e:
+            ok = False
+            results.append(f"FAIL graphics card capture: {e!r}")
     with open(os.path.join(DATA_DIR, "smoke-test.txt"), "w", encoding="utf-8") as f:
         f.write("\n".join(results + ["PASSED" if ok else "FAILED"]) + "\n")
     return ok

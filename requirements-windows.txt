@@ -5,6 +5,9 @@ pillow
 cryptography
 # Reading the spectator screen: image matching and Windows text recognition.
 numpy
+# When Windows' screen copy gives a black game: copied off the graphics card (DXGI).
+dxcam==0.3.0
+comtypes
 winrt-runtime
 winrt-Windows.Foundation
 winrt-Windows.Foundation.Collections

@@ -394,6 +394,7 @@ async function post(url, body) {
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const data = await r.json();
   if (data.error) alert(data.error); else apply(data);
+  return data;
 }
 function setIfIdle(el, value) { if (document.activeElement !== el) el.value = value; }
 
@@ -542,7 +543,11 @@ $("reader-report").onclick = () => post("/api/report", {});
 $("scan-names").onclick = async () => {
   $("scan-names").disabled = true;
   $("scan-result").textContent = "Scanning…";
-  try { await post("/api/reader/names", {}); } finally { $("scan-names").disabled = false; }
+  let data = {};
+  try { data = await post("/api/reader/names", {}); }
+  catch (e) { data = { error: String(e) }; }
+  finally { $("scan-names").disabled = false; }
+  if (data.error) { $("scan-result").textContent = "Couldn't scan: " + data.error; return; }
   const scan = state && state.app.scan;
   if (scan) $("scan-result").textContent = `Filled in ${scan.found} of 10.`
     + (scan.missed.length ? ` Couldn't tell whose: ${scan.missed.join(", ")} (agent not recognised yet): type those in.` : "");

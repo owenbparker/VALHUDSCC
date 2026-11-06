@@ -950,16 +950,106 @@ def capture_valorant(top=None):
     point = wintypes.POINT(0, 0)
     user32.ClientToScreen(hwnd, ctypes.byref(point))
     rows = height if top is None else min(height, max(1, round(top * height / REF_H)))
-    image = None if _uncovered(hwnd, point.x, point.y, width, rows) else _print_window(hwnd, width, height)
+    box = (point.x, point.y, point.x + width, point.y + rows)
+    uncovered = _uncovered(hwnd, point.x, point.y, width, rows)
+    image = None if uncovered else _print_window(hwnd, width, height)
     if image is not None:
         if rows < height:
             image = image.crop((0, 0, width, rows))
     else:
         # On top (or Windows wouldn't give its picture): what's on screen.
-        from PIL import ImageGrab
-        image = ImageGrab.grab((point.x, point.y, point.x + width, point.y + rows), all_screens=True)
+        # Some PCs (windowed fullscreen drawn straight to the display, HDR,
+        # some GPU drivers) give Windows' ordinary screen copy a black game:
+        # then it's taken off the graphics card (DXGI desktop duplication).
+        image = None
+        if not CAPTURE["gdi_black"]:
+            from PIL import ImageGrab
+            image = ImageGrab.grab(box, all_screens=True)
+        if image is None or (uncovered and _is_black(image)):
+            dx = _dxgi_grab(box)
+            if dx is not None and not _is_black(dx):
+                if not CAPTURE.get("gdi_black"):
+                    log("VALORANT comes out black in Windows' screen copy on this PC: "
+                        "reading it straight off the graphics card instead")
+                CAPTURE["gdi_black"], CAPTURE["method"] = True, "graphics card"
+                image = dx
+            elif image is None:
+                from PIL import ImageGrab
+                image = ImageGrab.grab(box, all_screens=True)
+    if uncovered and _is_black(image):
+        return None, _black_reason(hwnd)
     image.info["full_height"] = height
     return image, None
+
+
+# How the game's being captured (for the status line and the log).
+CAPTURE = {"gdi_black": False, "method": "screen", "dxgi_error": None, "dxgi_failed_at": 0.0, "black_logged": False}
+
+
+def _is_black(image):
+    small = image.convert("L").resize((64, 36))
+    return max(small.getdata()) < 8
+
+
+def _black_reason(hwnd):
+    """Why every capture of VALORANT is black, as far as can be told."""
+    import ctypes
+    from ctypes import wintypes
+    affinity = wintypes.DWORD(0)
+    try:
+        ctypes.windll.user32.GetWindowDisplayAffinity(hwnd, ctypes.byref(affinity))
+    except Exception:
+        pass
+    if affinity.value in (1, 0x11):
+        why = (f"VALORANT is hiding its window from screen capture (display affinity {affinity.value:#x}): "
+               "nothing on this PC can copy it")
+    else:
+        why = ("VALORANT comes out black when the screen is copied"
+               + (f" (graphics card capture: {CAPTURE['dxgi_error']})" if CAPTURE.get("dxgi_error") else
+                  " (also off the graphics card)")
+               + ". Try: Windows Settings > System > Display > Graphics > turn off 'Optimizations for windowed "
+               "games', and turn HDR off, then restart VALORANT")
+    if not CAPTURE["black_logged"]:
+        CAPTURE["black_logged"] = True
+        log(why, "warn")
+    return why
+
+
+_dxgi = {}
+
+
+def _dxgi_grab(box):
+    """The screen area box = (left, top, right, bottom) in desktop pixels,
+    copied off the graphics card (DXGI desktop duplication, via dxcam), or
+    None."""
+    if time.time() - CAPTURE["dxgi_failed_at"] < 30:
+        return None
+    try:
+        import dxcam
+        from PIL import Image
+        factory = vars(dxcam)["__factory"]
+        x, y = box[0], box[1]
+        for d, outputs in enumerate(factory.outputs):
+            for o, out in enumerate(outputs):
+                r = out.desc.DesktopCoordinates
+                if r.left <= x < r.right and r.top <= y < r.bottom:
+                    cam = _dxgi.get((d, o))
+                    if cam is None:
+                        cam = _dxgi[(d, o)] = dxcam.create(device_idx=d, output_idx=o, output_color="RGB",
+                                                           processor_backend="numpy")
+                    region = (max(0, box[0] - r.left), max(0, box[1] - r.top),
+                              min(r.right - r.left, box[2] - r.left), min(r.bottom - r.top, box[3] - r.top))
+                    frame = cam.grab(region=region, new_frame_only=False)
+                    if frame is None:
+                        return None
+                    return Image.fromarray(frame)
+        raise RuntimeError("no display holds the VALORANT window")
+    except Exception as e:
+        CAPTURE["dxgi_failed_at"] = time.time()
+        if CAPTURE["dxgi_error"] != repr(e):
+            CAPTURE["dxgi_error"] = repr(e)
+            log(f"Graphics card capture failed: {e!r}", "warn")
+        return None
 
 
 def _uncovered(hwnd, x, y, width, height):
