@@ -108,6 +108,25 @@ jobs:
           name: ValorantHUD-windows
           path: dist/ValorantHUD
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Build SCC-VAL-Overwolf-Link.exe (ow-electron, Overwolf's game events inside)
+        shell: pwsh
+        working-directory: overwolf-link
+        run: |
+          npm install --no-audit --no-fund
+          if ($LASTEXITCODE) { exit 1 }
+          npm run build
+          if ($LASTEXITCODE) { exit 1 }
+          if (-not (Test-Path dist\SCC-VAL-Overwolf-Link.exe)) { Get-ChildItem dist -Recurse | Select-Object -First 40; throw "SCC-VAL-Overwolf-Link.exe wasn't built" }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SCC-VAL-Overwolf-Link
+          path: overwolf-link/dist/SCC-VAL-Overwolf-Link.exe
+
       - name: Build the installer
         if: "!contains(github.event.head_commit.message, '[no release]')"
         shell: pwsh
@@ -126,7 +145,7 @@ jobs:
           Compress-Archive -Path dist\ValorantHUD\* -DestinationPath ValorantHUD-windows.zip
           $notes = git log -1 --format=%B | Where-Object { $_ -notmatch '^(Co-Authored-By|Claude-Session):' }
           $notes = ($notes -join "`n").Trim()
-          gh release create "$env:VERSION" ValorantHUD-windows.zip dist\SCC-VAL-HUD-Setup.exe --target "${{ github.sha }}" --title "VALORANT HUD $env:VERSION" --notes "$notes"
+          gh release create "$env:VERSION" ValorantHUD-windows.zip dist\SCC-VAL-HUD-Setup.exe overwolf-link\dist\SCC-VAL-Overwolf-Link.exe --target "${{ github.sha }}" --title "VALORANT HUD $env:VERSION" --notes "$notes"
         env:
           GH_TOKEN: ${{ github.token }}
 

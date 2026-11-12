@@ -1,6 +1,6 @@
-"""VALORANT data from Overwolf's game events (the SCC VAL HUD Link app in
-overwolf-app/ posts them to /api/ingest as {"source": "overwolf",
-"overwolf": {...}}).
+"""VALORANT data from Overwolf's game events (SCC-VAL-Overwolf-Link.exe,
+built from overwolf-link/ with ow-electron, posts them to /api/ingest as
+{"source": "overwolf", "overwolf": {...}}).
 
 While Overwolf is live it is where the HUD gets everything it gives: names,
 agents, alive or dead, K/D/A, credits, weapons, shields, ult points, the

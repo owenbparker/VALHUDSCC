@@ -19,7 +19,7 @@ from urllib.parse import parse_qs, unquote, urlparse
 from . import game, mapbans, outputs, recolor
 from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub, cam_links
-from .config import DATA_DIR, LOGO_DIR, OVERWOLF_APP_DIR, SPONSOR_DIR, WEB_DIR, web_file
+from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
 from .demo import DemoGame
 from .enginelink import EngineLink, save_logo_bytes, save_sponsors
 from .log import log, since
@@ -72,7 +72,7 @@ class HudApp:
         self.cams = CamHub()   # player webcams (SCC Player Cam, VALORANT mode)
         self.agent_select = AgentSelect()
         self._select_demo = None
-        # VALORANT's game events from Overwolf (overwolf-app/): the main source
+        # VALORANT's game events from Overwolf (the SCC VAL Overwolf Link, overwolf-link/): the main source
         # while they come in; the screen reader keeps health and fills in.
         self.overwolf = Overwolf(config, log)
         self.map_art = mapbans.MapArt()
@@ -506,7 +506,7 @@ class HudApp:
         return path
 
     def open_folder(self, which):
-        folders = {"output": self.config.output_dir(), "overwolf": OVERWOLF_APP_DIR, "logos": LOGO_DIR, "app": DATA_DIR, "sponsors": SPONSOR_DIR,
+        folders = {"output": self.config.output_dir(), "logos": LOGO_DIR, "app": DATA_DIR, "sponsors": SPONSOR_DIR,
                    "frames": os.path.join(DATA_DIR, "frames")}
         path = folders[which]
         os.makedirs(path, exist_ok=True)

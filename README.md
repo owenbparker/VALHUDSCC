@@ -86,12 +86,12 @@ VALORANT has no official live-data API for spectators like League's. Riot keeps 
 
 **Overwolf (main source)**: the HUD's game info comes from Overwolf's VALORANT game events while they come in: names, agents, alive or dead, K/D/A, credits, weapons, shields, ult points, the spike carrier, defuses and detonations, round, phase, score, sides, map, round history, who the observer is watching, and agent select (names, agents, locks, map). The screen reader still reads **health** (Overwolf only has the local player's), the spike being planted and the round timer, and anything Overwolf leaves empty. If Overwolf stops sending for 6 seconds (it, the app or its game events die), or its score disagrees with the screen's for 30 seconds, the screen reader reads everything again by itself, and Overwolf takes over again when it's back. Live data shows which it is.
 
-Setting it up, on the PC that runs VALORANT (the observer PC):
-1. Install [Overwolf](https://www.overwolf.com/).
-2. In the HUD, Live data -> **Overwolf app folder** opens the SCC VAL HUD Link app (`overwolf-app` in the install folder).
-3. In Overwolf: Settings -> About -> Development options -> **Load unpacked extension**, and pick that folder. (Overwolf only lets accounts it has approved as developers load unpacked apps.)
-4. Keep the HUD running on that PC: on the GFX PC itself, or as the Observer Client pointed at the GFX PC (which then needs "Let other PCs on the network read the HUD"). The app posts to `http://localhost:8778`, and the observer client passes it on.
-5. Keep **Read VALORANT on this PC** on too: it reads health, and it's the backup.
+Setting it up, on the PC that runs VALORANT (the observer PC). No Overwolf install is needed:
+1. Download **[SCC-VAL-Overwolf-Link.exe](https://github.com/owenbparker/VALHUDSCC/releases/latest/download/SCC-VAL-Overwolf-Link.exe)** and run it (it's built with Overwolf's ow-electron, with their game events package inside). Start it before or after VALORANT.
+2. Keep the HUD running on that PC too: the GFX Controller, or the Observer Client pointed at the GFX PC (which then needs "Let other PCs on the network read the HUD"). The link posts to `http://localhost:8778` (changeable in its window), and the observer client passes it on.
+3. Keep **Read VALORANT on this PC** on: it reads health, and it's the backup.
+
+The link's window shows Overwolf's game events, VALORANT and the HUD each green when working. Overwolf only gives game events to apps it has approved (its app proposal form); until then they may not come through. **Use Overwolf's test channel** in the link's window starts it on Overwolf's development channel, for games whose events aren't released to ow-electron yet. The link's source is `overwolf-link/` (`npm install`, `npm start`).
 
 Untested so far: what Overwolf fills in for an observer (its docs are written from a player's view). If Live data says "live, but it has no scoreboard", the screen reader is doing the work. Team 0 (Overwolf's first-attacking team) goes on the side the top bar's agents say, else on the side set to attack first; each player goes in their top bar seat by agent.
 

@@ -18,7 +18,6 @@ RESOURCE_DIR = getattr(sys, "_MEIPASS", ROOT) if FROZEN else ROOT
 # Things the app writes: settings, uploaded logos, output files.
 DATA_DIR = os.path.dirname(os.path.abspath(sys.executable)) if FROZEN else ROOT
 WEB_DIR = os.path.join(RESOURCE_DIR, "web")
-OVERWOLF_APP_DIR = os.path.join(RESOURCE_DIR, "overwolf-app")   # the Overwolf app (load it unpacked in Overwolf)
 LOGO_DIR = os.path.join(DATA_DIR, "logos")
 SPONSOR_DIR = os.path.join(DATA_DIR, "sponsors")   # uploaded sponsor logos (served as sponsors/...)
 CONFIG_PATH = os.path.join(DATA_DIR, "config.json")
