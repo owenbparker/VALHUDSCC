@@ -26,6 +26,7 @@ from .log import log, since
 from .reader import ScreenReader
 from .series import Series
 from .overwolf import Overwolf
+from .riotclient import RiotClient
 from .source import LiveFeed
 from .updater import Updater, clean_up_old_update
 
@@ -75,6 +76,11 @@ class HudApp:
         # VALORANT's game events from Overwolf (the SCC VAL Overwolf Link, overwolf-link/): the main source
         # while they come in; the screen reader keeps health and fills in.
         self.overwolf = Overwolf(config, log)
+        # Agent select and the roster's Riot IDs from the Riot Client on this
+        # PC (sent the same way as the screen reader's readings).
+        self.riot = RiotClient(self._reader_update, config, DATA_DIR, log)
+        self.riot_roster, self.riot_at, self._riot_select_at = None, 0.0, 0.0
+        self.riot.start()
         self.map_art = mapbans.MapArt()
         self.series = Series(config, log)   # maps from Map Bans, won maps, the series score
 
@@ -175,13 +181,25 @@ class HudApp:
             if self.role == "observer":
                 return self._reader_update(update)   # (an observer PC's Overwolf: to the GFX PC)
             return self.overwolf_update(update["overwolf"])
+        if isinstance(update, dict) and isinstance(update.get("riot_roster"), dict):
+            update = dict(update)
+            self.riot_roster, self.riot_at = update.pop("riot_roster"), time.time()
+            if not update.get("match") and not update.get("players"):
+                if self.mode == "live":
+                    self.refresh()
+                return {"ok": True}
         if isinstance(update, dict) and isinstance(update.get("agent_select"), dict):
             update = dict(update)
-            if self.overwolf.screen_select():
-                update.pop("agent_select")   # Overwolf has agent select
+            source = str(update.get("source") or "screen")
+            # Agent select from Overwolf first, then the Riot Client, then the screen.
+            if source == "riot" and not self.overwolf.screen_select():
+                self._riot_select_at = time.time()
+            if self.overwolf.screen_select() or (source != "riot" and time.time() - self._riot_select_at < 5):
+                update.pop("agent_select")
                 if not update.get("match") and not update.get("players") and "spectating" not in update:
                     return {"ok": True}
-            self.agent_select_update(self._select_sides(update.pop("agent_select")), "screen")
+            else:
+                self.agent_select_update(self._select_sides(update.pop("agent_select")), "riot" if source == "riot" else "screen")
             if not update.get("match") and not update.get("players") and "spectating" not in update:
                 if self.mode == "live":
                     self.refresh()   # (a map read off the screen)
@@ -227,7 +245,13 @@ class HudApp:
         state = game.with_overrides(raw, cfg)
         # Names not typed or scanned: the ones read in agent select, by agent.
         picks = self.agent_select.view([])["players"]
+        roster = self.riot_roster if time.time() - self.riot_at < 30 else None
         for p in state["players"]:
+            if not p.get("name") and p.get("agent") and roster:
+                # The Riot Client's roster: the Riot ID of the player on that agent.
+                match = [q["name"] for q in roster.get(p["team"]) or [] if q.get("agent") == p["agent"] and q.get("name")]
+                if len(match) == 1:
+                    p["name"] = match[0]
             if not p.get("name") and p.get("agent"):
                 match = [q["name"] for q in picks.get(p["team"], []) if q.get("agent") == p["agent"] and q.get("name")]
                 if len(match) == 1:
@@ -347,6 +371,7 @@ class HudApp:
             self._stop.wait(0.25)
 
     def stop(self):
+        self.riot.stop()
         self._stop.set()
         self.reader.stop()
         self.engine.stop()
@@ -360,7 +385,9 @@ class HudApp:
         lan = lan_ip() if network else None
         return {"mode": self.mode, "role": self.role, "demo_speed": self.demo_speed, "network": network, "port": port,
                 "feed": self.feed.info(), "reader": self.reader.info(),
-                "overwolf": self.overwolf.status(), "update": self.updater.info(),
+                "overwolf": self.overwolf.status(),
+                "riot": dict(self.riot.info(), received=round(time.time() - max(self.riot_at, self._riot_select_at), 1)
+                             if max(self.riot_at, self._riot_select_at) else None), "update": self.updater.info(),
                 "scan": getattr(self, "last_scan", None),
                 "overlay_window": self.overlay_window.info() if self.overlay_window else {"available": False},
                 "lan_url": f"http://{lan}:{port}" if lan else None, "data_dir": DATA_DIR,

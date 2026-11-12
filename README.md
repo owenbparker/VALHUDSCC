@@ -95,6 +95,8 @@ The link's window shows Overwolf's game events, VALORANT and the HUD each green 
 
 Untested so far: what Overwolf fills in for an observer (its docs are written from a player's view). If Live data says "live, but it has no scoreboard", the screen reader is doing the work. Team 0 (Overwolf's first-attacking team) goes on the side the top bar's agents say, else on the side set to attack first; each player goes in their top bar seat by agent.
 
+**Riot Client** (automatic, on the PC running VALORANT): the HUD also reads the Riot Client's local API (unofficial; the same calls the game's menus and rank-checker tools use). It gives agent select (every player's Riot ID, agent, lock, the map and timer) and, in the match, each player's Riot ID by agent, which fills in names. Agent select comes from Overwolf first, then the Riot Client, then the screen. Nothing live from the round comes from it. Untested so far: what it shows an observer account in a custom game.
+
 Anything that can read the match can already feed the HUD by POSTing JSON to `http://localhost:8778/api/ingest`. Only changed fields need sending:
 
 ```json

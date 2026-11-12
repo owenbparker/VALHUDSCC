@@ -636,7 +636,10 @@ function apply(s) {
   $("reader-status").textContent = !rd.available ? rd.status
     : rd.enabled ? `${rd.status}${rd.age != null ? ` (last read ${rd.age}s ago)` : ""}. Keep the top bar visible; open the Tab scoreboard (e.g. in the buy phase) to read names, credits, weapons, ults and K/D/A.`
     : "Off. Turn on when VALORANT (spectating) runs on this PC.";
-  $("overwolf-status").textContent = (app.overwolf || {}).status || "";
+  const riot = app.riot || {};
+  $("overwolf-status").textContent = [(app.overwolf || {}).status || "",
+    riot.received != null && riot.received < 30 ? `Riot Client: agent select and Riot IDs coming in (${riot.received}s ago)`
+      : `Riot Client on this PC: ${riot.status || "off"}`].filter(Boolean).join(" · ");
   const f = app.feed;
   $("feed").innerHTML = f.updates
     ? `${f.updates} updates received; last ${f.age}s ago. Sources: ` + Object.entries(f.sources).map(([k, v]) => `<code>${k}</code> (${v}s ago)`).join(", ")
