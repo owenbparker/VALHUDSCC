@@ -16,7 +16,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import game, mapbans, outputs, recolor
+from . import appearance, game, mapbans, outputs, recolor
 from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub, cam_links
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
@@ -667,6 +667,8 @@ def make_handler(app):
         def do_GET(self):
             url = urlparse(self.path)
             path = url.path
+            if appearance.handle(self, "GET", path, DATA_DIR):
+                return
             fields = app.snapshot()["fields"]
             if path == "/":
                 self.send_response(302)
@@ -763,6 +765,8 @@ def make_handler(app):
             # change it.
             url = urlparse(self.path)
             path = url.path
+            if appearance.handle(self, "POST", path, DATA_DIR):
+                return
             if path in ("/api/cam/poll", "/api/cam/send", "/api/cam/list"):
                 length = int(self.headers.get("Content-Length") or 0)
                 try:
