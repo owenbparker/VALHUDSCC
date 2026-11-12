@@ -344,6 +344,10 @@
       <button id="reader-report" style="flex:0 0 auto" title="Zips everything to send in after a show: the frames the reader saved by itself when it couldn't read something, your saved frames and the log">Problem report</button>
       <span class="note" style="margin:0">Something read wrong? Save a frame at that moment. The reader also saves one by itself when it can't read a screen. After the show, press Problem report and send the zip from the folder that opens.</span>
     </div>
+    <div class="row" style="margin-bottom:10px;align-items:center">
+      <span class="note" id="overwolf-status" style="margin:0;flex:1"></span>
+      <button type="button" data-open="overwolf" style="flex:0 0 auto" title="The SCC VAL HUD Link app: in Overwolf, Settings > About > Development options > Load unpacked, and pick this folder">Overwolf app folder</button>
+    </div>
     <div class="feed" id="feed"></div>
     <details class="note" style="margin-top:8px">
       <summary>Sending live data to the HUD</summary>
@@ -632,6 +636,8 @@ function apply(s) {
   $("reader-status").textContent = !rd.available ? rd.status
     : rd.enabled ? `${rd.status}${rd.age != null ? ` (last read ${rd.age}s ago)` : ""}. Keep the top bar visible; open the Tab scoreboard (e.g. in the buy phase) to read names, credits, weapons, ults and K/D/A.`
     : "Off. Turn on when VALORANT (spectating) runs on this PC.";
+  const ow = app.overwolf || {};
+  $("overwolf-status").textContent = ow.status || "";
   const f = app.feed;
   $("feed").innerHTML = f.updates
     ? `${f.updates} updates received; last ${f.age}s ago. Sources: ` + Object.entries(f.sources).map(([k, v]) => `<code>${k}</code> (${v}s ago)`).join(", ")

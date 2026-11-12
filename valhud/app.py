@@ -19,12 +19,13 @@ from urllib.parse import parse_qs, unquote, urlparse
 from . import game, mapbans, outputs, recolor
 from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub, cam_links
-from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
+from .config import DATA_DIR, LOGO_DIR, OVERWOLF_APP_DIR, SPONSOR_DIR, WEB_DIR, web_file
 from .demo import DemoGame
 from .enginelink import EngineLink, save_logo_bytes, save_sponsors
 from .log import log, since
 from .reader import ScreenReader
 from .series import Series
+from .overwolf import Overwolf
 from .source import LiveFeed
 from .updater import Updater, clean_up_old_update
 
@@ -71,6 +72,9 @@ class HudApp:
         self.cams = CamHub()   # player webcams (SCC Player Cam, VALORANT mode)
         self.agent_select = AgentSelect()
         self._select_demo = None
+        # VALORANT's game events from Overwolf (overwolf-app/): the main source
+        # while they come in; the screen reader keeps health and fills in.
+        self.overwolf = Overwolf(config, log)
         self.map_art = mapbans.MapArt()
         self.series = Series(config, log)   # maps from Map Bans, won maps, the series score
 
@@ -167,8 +171,16 @@ class HudApp:
 
     def ingest(self, update):
         """Live data from a feed (screen reader, Overwolf app, another tool)."""
+        if isinstance(update, dict) and isinstance(update.get("overwolf"), dict):
+            if self.role == "observer":
+                return self._reader_update(update)   # (an observer PC's Overwolf: to the GFX PC)
+            return self.overwolf_update(update["overwolf"])
         if isinstance(update, dict) and isinstance(update.get("agent_select"), dict):
             update = dict(update)
+            if self.overwolf.screen_select():
+                update.pop("agent_select")   # Overwolf has agent select
+                if not update.get("match") and not update.get("players") and "spectating" not in update:
+                    return {"ok": True}
             self.agent_select_update(self._select_sides(update.pop("agent_select")), "screen")
             if not update.get("match") and not update.get("players") and "spectating" not in update:
                 if self.mode == "live":
@@ -183,10 +195,22 @@ class HudApp:
                 return self.observed_name()
         if isinstance(update, dict) and update.get("source") == "screen" and self.config.get().get("team_size") == 2:
             update = game.round_won(self.feed.state, game.two_a_side(update))
+        if isinstance(update, dict) and update.get("source") == "screen":
+            update = self.overwolf.screen(update)
         self.feed.apply(update)
         if self.mode == "live":
             self.refresh()
         return self.observed_name()
+
+    def overwolf_update(self, msg):
+        update, select = self.overwolf.receive(msg)
+        if select:
+            self.agent_select_update(select, "overwolf")
+        if update:
+            self.feed.apply(update)
+        if self.mode == "live" and (update or select):
+            self.refresh()
+        return {"ok": True, "live": self.overwolf.live()}
 
     SPECTATING_FOR = 3.0   # seconds a reading counts for (the observer sends one a second at least)
 
@@ -209,7 +233,10 @@ class HudApp:
                 if len(match) == 1:
                     p["name"] = match[0]
         text, at, agent, side = self.spectating
-        if time.time() - at < self.SPECTATING_FOR:
+        watching = self.overwolf.observing()
+        if watching and game.observed_player(state, watching):
+            state["match"]["observed"] = game.observed_player(state, watching)
+        elif time.time() - at < self.SPECTATING_FOR:
             state["match"]["observed"] = (game.observed_player(state, text)
                                           or game.observed_by_agent(state, agent, side))
         self.series.round_kills(state)
@@ -332,7 +359,8 @@ class HudApp:
         network = bool(cfg.get("allow_network"))
         lan = lan_ip() if network else None
         return {"mode": self.mode, "role": self.role, "demo_speed": self.demo_speed, "network": network, "port": port,
-                "feed": self.feed.info(), "reader": self.reader.info(), "update": self.updater.info(),
+                "feed": self.feed.info(), "reader": self.reader.info(),
+                "overwolf": self.overwolf.status(), "update": self.updater.info(),
                 "scan": getattr(self, "last_scan", None),
                 "overlay_window": self.overlay_window.info() if self.overlay_window else {"available": False},
                 "lan_url": f"http://{lan}:{port}" if lan else None, "data_dir": DATA_DIR,
@@ -478,7 +506,7 @@ class HudApp:
         return path
 
     def open_folder(self, which):
-        folders = {"output": self.config.output_dir(), "logos": LOGO_DIR, "app": DATA_DIR, "sponsors": SPONSOR_DIR,
+        folders = {"output": self.config.output_dir(), "overwolf": OVERWOLF_APP_DIR, "logos": LOGO_DIR, "app": DATA_DIR, "sponsors": SPONSOR_DIR,
                    "frames": os.path.join(DATA_DIR, "frames")}
         path = folders[which]
         os.makedirs(path, exist_ok=True)

@@ -84,6 +84,17 @@ VALORANT has no official live-data API for spectators like League's. Riot keeps 
 
 **Reading the screen** (Live data -> Read VALORANT on this PC): the top bar gives who's alive, health (white or red bar), the spike and the score; each seat's agent is learned from the top bar portraits (and re-checked, so a mistake corrects itself). With the Tab scoreboard open (it is in the buy phase) it also reads names (without team tags), ult points, K/D/A, credits, guns and shields; its rows are in score order, so each is matched to its seat by agent. **Save frame** saves the screen as the reader sees it, with what it read, to the `frames` folder: send those when something reads wrong. Deaths and health are read on their own, about ten times a second, so a death shows almost at once; the rest (names, credits, guns...) takes a second or so per read.
 
+**Overwolf (main source)**: the HUD's game info comes from Overwolf's VALORANT game events while they come in: names, agents, alive or dead, K/D/A, credits, weapons, shields, ult points, the spike carrier, defuses and detonations, round, phase, score, sides, map, round history, who the observer is watching, and agent select (names, agents, locks, map). The screen reader still reads **health** (Overwolf only has the local player's), the spike being planted and the round timer, and anything Overwolf leaves empty. If Overwolf stops sending for 6 seconds (it, the app or its game events die), or its score disagrees with the screen's for 30 seconds, the screen reader reads everything again by itself, and Overwolf takes over again when it's back. Live data shows which it is.
+
+Setting it up, on the PC that runs VALORANT (the observer PC):
+1. Install [Overwolf](https://www.overwolf.com/).
+2. In the HUD, Live data -> **Overwolf app folder** opens the SCC VAL HUD Link app (`overwolf-app` in the install folder).
+3. In Overwolf: Settings -> About -> Development options -> **Load unpacked extension**, and pick that folder. (Overwolf only lets accounts it has approved as developers load unpacked apps.)
+4. Keep the HUD running on that PC: on the GFX PC itself, or as the Observer Client pointed at the GFX PC (which then needs "Let other PCs on the network read the HUD"). The app posts to `http://localhost:8778`, and the observer client passes it on.
+5. Keep **Read VALORANT on this PC** on too: it reads health, and it's the backup.
+
+Untested so far: what Overwolf fills in for an observer (its docs are written from a player's view). If Live data says "live, but it has no scoreboard", the screen reader is doing the work. Team 0 (Overwolf's first-attacking team) goes on the side the top bar's agents say, else on the side set to attack first; each player goes in their top bar seat by agent.
+
 Anything that can read the match can already feed the HUD by POSTing JSON to `http://localhost:8778/api/ingest`. Only changed fields need sending:
 
 ```json

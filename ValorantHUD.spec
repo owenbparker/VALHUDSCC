@@ -12,7 +12,7 @@ root = SPECPATH
 icon = os.path.join(root, "packaging", "icon.ico")
 from PyInstaller.utils.hooks import collect_all
 
-hidden, datas, binaries = [], [(os.path.join(root, "web"), "web")], []
+hidden, datas, binaries = [], [(os.path.join(root, "web"), "web"), (os.path.join(root, "overwolf-app"), "overwolf-app")], []
 if sys.platform == "win32":
     # pywebview's Windows window (Edge WebView2) is loaded at runtime.
     hidden += ["webview.platforms.winforms", "webview.platforms.edgechromium", "clr"]
