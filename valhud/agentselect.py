@@ -93,7 +93,7 @@ class AgentSelect:
                  "players": {side: [dict(p) for p in self.state["players"][side]] for side in SIDES}}
             timer, at = self.state["timer"], self.state["timer_at"]
             # A screen reading that has stopped coming: agent select is over.
-            if self.source in ("screen", "overwolf", "riot") and time.time() - self.updated_at > STALE_AFTER:
+            if self.source in ("screen", "riot") and time.time() - self.updated_at > STALE_AFTER:
                 s["active"] = False
         s["timer"] = max(0, int(timer - (time.time() - at) + 0.999)) if at else 0
         names = {(p["team"], p["slot"]): p.get("name") or "" for p in players}

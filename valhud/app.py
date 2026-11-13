@@ -25,7 +25,6 @@ from .enginelink import EngineLink, save_logo_bytes, save_sponsors
 from .log import log, since
 from .reader import ScreenReader
 from .series import Series
-from .overwolf import Overwolf
 from .riotclient import RiotClient
 from .source import LiveFeed
 from .updater import Updater, clean_up_old_update
@@ -73,9 +72,6 @@ class HudApp:
         self.cams = CamHub()   # player webcams (SCC Player Cam, VALORANT mode)
         self.agent_select = AgentSelect()
         self._select_demo = None
-        # VALORANT's game events from Overwolf (the SCC VAL Overwolf Link, overwolf-link/): the main source
-        # while they come in; the screen reader keeps health and fills in.
-        self.overwolf = Overwolf(config, log)
         # Agent select and the roster's Riot IDs from the Riot Client on this
         # PC (sent the same way as the screen reader's readings).
         self.riot = RiotClient(self._reader_update, config, DATA_DIR, log)
@@ -176,11 +172,7 @@ class HudApp:
             log("Stopped reading the screen")
 
     def ingest(self, update):
-        """Live data from a feed (screen reader, Overwolf app, another tool)."""
-        if isinstance(update, dict) and isinstance(update.get("overwolf"), dict):
-            if self.role == "observer":
-                return self._reader_update(update)   # (an observer PC's Overwolf: to the GFX PC)
-            return self.overwolf_update(update["overwolf"])
+        """Live data from a feed (screen reader, Riot Client, another tool)."""
         if isinstance(update, dict) and isinstance(update.get("riot_roster"), dict):
             update = dict(update)
             self.riot_roster, self.riot_at = update.pop("riot_roster"), time.time()
@@ -191,10 +183,10 @@ class HudApp:
         if isinstance(update, dict) and isinstance(update.get("agent_select"), dict):
             update = dict(update)
             source = str(update.get("source") or "screen")
-            # Agent select from Overwolf first, then the Riot Client, then the screen.
-            if source == "riot" and not self.overwolf.screen_select():
+            # Agent select from the Riot Client first, then the screen.
+            if source == "riot":
                 self._riot_select_at = time.time()
-            if self.overwolf.screen_select() or (source != "riot" and time.time() - self._riot_select_at < 5):
+            if source != "riot" and time.time() - self._riot_select_at < 5:
                 update.pop("agent_select")
                 if not update.get("match") and not update.get("players") and "spectating" not in update:
                     return {"ok": True}
@@ -213,22 +205,10 @@ class HudApp:
                 return self.observed_name()
         if isinstance(update, dict) and update.get("source") == "screen" and self.config.get().get("team_size") == 2:
             update = game.round_won(self.feed.state, game.two_a_side(update))
-        if isinstance(update, dict) and update.get("source") == "screen":
-            update = self.overwolf.screen(update)
         self.feed.apply(update)
         if self.mode == "live":
             self.refresh()
         return self.observed_name()
-
-    def overwolf_update(self, msg):
-        update, select = self.overwolf.receive(msg)
-        if select:
-            self.agent_select_update(select, "overwolf")
-        if update:
-            self.feed.apply(update)
-        if self.mode == "live" and (update or select):
-            self.refresh()
-        return {"ok": True, "live": self.overwolf.live()}
 
     SPECTATING_FOR = 3.0   # seconds a reading counts for (the observer sends one a second at least)
 
@@ -257,10 +237,7 @@ class HudApp:
                 if len(match) == 1:
                     p["name"] = match[0]
         text, at, agent, side = self.spectating
-        watching = self.overwolf.observing()
-        if watching and game.observed_player(state, watching):
-            state["match"]["observed"] = game.observed_player(state, watching)
-        elif time.time() - at < self.SPECTATING_FOR:
+        if time.time() - at < self.SPECTATING_FOR:
             state["match"]["observed"] = (game.observed_player(state, text)
                                           or game.observed_by_agent(state, agent, side))
         self.series.round_kills(state)
@@ -385,7 +362,6 @@ class HudApp:
         lan = lan_ip() if network else None
         return {"mode": self.mode, "role": self.role, "demo_speed": self.demo_speed, "network": network, "port": port,
                 "feed": self.feed.info(), "reader": self.reader.info(),
-                "overwolf": self.overwolf.status(),
                 "riot": dict(self.riot.info(), received=round(time.time() - max(self.riot_at, self._riot_select_at), 1)
                              if max(self.riot_at, self._riot_select_at) else None), "update": self.updater.info(),
                 "scan": getattr(self, "last_scan", None),

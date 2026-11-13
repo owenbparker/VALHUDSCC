@@ -9,7 +9,7 @@ What it gives, sent through the screen reader's path to the HUD:
       -> {"source": "riot", "riot_roster": {"left": [{"name", "agent"}], ...},
           "match": {"map": ...}}
 It has nothing live from the round (alive, health, kills, credits): those
-stay with Overwolf and the screen reader.
+stay with the screen reader.
 
 How: the Riot Client's lockfile gives a local port and password; the local
 API gives the account (PUUID), its tokens and the region; the game servers
@@ -29,7 +29,12 @@ import urllib.error
 import urllib.request
 
 from . import game
-from .overwolf import MAP_IDS
+
+# Internal map names (MapID's last part) -> ours.
+MAP_IDS = {"Infinity": "Abyss", "Triad": "Haven", "Duality": "Bind", "Bonsai": "Split", "Ascent": "Ascent",
+           "Port": "Icebox", "Foxtrot": "Breeze", "Canyon": "Fracture", "Pitt": "Pearl", "Jam": "Lotus",
+           "Juliett": "Sunset", "Rook": "Corrode", "Range": "Range", "HURM_Alley": "District",
+           "HURM_Yard": "Piazza", "HURM_Bowl": "Kasbah", "HURM_Helix": "Drift", "HURM_HighTide": "Glitch"}
 
 PLATFORM = base64.b64encode(json.dumps({
     "platformType": "PC", "platformOS": "Windows", "platformOSVersion": "10.0.19042.1.256.64bit",

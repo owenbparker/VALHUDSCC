@@ -1,5 +1,5 @@
 """The live feed: match data POSTed to /api/ingest by whatever reads the game
-(the screen reader, an Overwolf app, another tool), merged into one state."""
+(the screen reader, the Riot Client, another tool), merged into one state."""
 
 import threading
 import time
