@@ -432,8 +432,18 @@ def read(image, ocr=None, names=None, layout=None):
             p = {"team": side, "slot": row + 1, "agent": agent,
                  "locked": bool(agent) and card_locked(frame, side, row, layout)}
             if ocr and not names.get((side, row)):
+                # A name counts once it's been read the same twice (a first
+                # read mid-animation, or of a locked card's coloured text,
+                # can come out cut short); after 6 reads, the commonest.
                 try:
-                    names[(side, row)] = read_name(frame, side, row, ocr, layout)
+                    tries = names.setdefault(("tries", side, row), [])
+                    text = read_name(frame, side, row, ocr, layout)
+                    if text:
+                        tries.append(text)
+                    if text and tries.count(text) >= 2:
+                        names[(side, row)] = text
+                    elif len(tries) >= 6:
+                        names[(side, row)] = max(set(tries), key=lambda t: (tries.count(t), len(t)))
                 except Exception:
                     pass
             if names.get((side, row)):

@@ -186,7 +186,11 @@ class HudApp:
             # Agent select from the Riot Client first, then the screen.
             if source == "riot":
                 self._riot_select_at = time.time()
-            if source != "riot" and time.time() - self._riot_select_at < 5:
+            # (once the Riot Client's given this agent select, the screen's
+            # readings are left out until it ends: two sources' seat orders
+            # mixed would pair names with the wrong agents)
+            if source != "riot" and time.time() - self._riot_select_at < 5 + (120 if self.agent_select.source == "riot"
+                                                                               and self.agent_select.state["active"] else 0):
                 update.pop("agent_select")
                 if not update.get("match") and not update.get("players") and "spectating" not in update:
                     return {"ok": True}

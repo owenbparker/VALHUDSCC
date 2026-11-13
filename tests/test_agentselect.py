@@ -22,7 +22,10 @@ class AgentSelectTests(unittest.TestCase):
         sel.apply({"players": [{"team": "left", "slot": 2, "agent": "jett", "locked": False},
                                {"team": "right", "slot": 5, "agent": "KAY/O", "locked": True},
                                {"team": "right", "slot": 1, "agent": "Nobody"}]})
-        v = sel.view([{"team": "left", "slot": 2, "name": "Bolt"}])
+        # A name the screen didn't give: the HUD player's on that agent (not by seat).
+        v = sel.view([{"team": "left", "slot": 4, "agent": "Jett", "name": "Bolt"},
+                      {"team": "right", "slot": 5, "agent": "Sage", "name": "Wrong"}])
+        self.assertEqual(v["players"]["right"][4]["name"], "")
         self.assertTrue(v["active"])
         self.assertEqual(v["map"], "Lotus")
         self.assertEqual(v["players"]["left"][1], {"agent": "Jett", "locked": False, "name": "Bolt"})

@@ -96,11 +96,15 @@ class AgentSelect:
             if self.source in ("screen", "riot") and time.time() - self.updated_at > STALE_AFTER:
                 s["active"] = False
         s["timer"] = max(0, int(timer - (time.time() - at) + 0.999)) if at else 0
-        names = {(p["team"], p["slot"]): p.get("name") or "" for p in players}
         for side in SIDES:
-            for i, p in enumerate(s["players"][side]):
-                # The name read off the agent select screen, else the HUD's.
-                p["name"] = p.get("name") or names.get((side, i + 1), "")
+            for p in s["players"][side]:
+                # The name read off the agent select screen, else the HUD
+                # player's on that agent (not by seat: the HUD's seats are
+                # the top bar's, in another order than the cards).
+                if not p.get("name") and p.get("agent"):
+                    same = [q.get("name") for q in players
+                            if q.get("team") == side and q.get("agent") == p["agent"] and q.get("name")]
+                    p["name"] = same[0] if len(same) == 1 else ""
         s["source"] = self.source
         return s
 
