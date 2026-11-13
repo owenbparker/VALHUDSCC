@@ -20,6 +20,7 @@ from . import appearance, game, mapbans, outputs, recolor
 from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub, cam_links
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
+from hudbuilder import embed as hud_builder
 from .demo import DemoGame
 from .enginelink import EngineLink, save_logo_bytes, save_sponsors
 from .log import log, since
@@ -51,6 +52,7 @@ class HudApp:
         self.fields = game.fields(self.state, config.get())
         self.updated_at = 0.0
         self.server = None
+        self.builder = None         # Custom design: HUD Builder, built in (hudbuilder/embed.py)
         self.updater = Updater()
         self.reader = ScreenReader(self._reader_update)
         self.overlay_window = None  # the desktop app's HUD-over-the-game window
@@ -351,7 +353,26 @@ class HudApp:
                 log(f"Update failed: {e!r}", "error")
             self._stop.wait(0.25)
 
+    def _builder_snapshot(self):
+        """What Custom design reads: what the GFX Engine gets, with the teams' logos."""
+        snap = self._engine_snapshot()
+        cfg = self.config.get()
+        series = snap.get("series") or {}
+        for side in ("left", "right"):
+            team = cfg.get(side) if isinstance(cfg.get(side), dict) else (cfg.get("match") or {}).get(side) or {}
+            # (the HUD's own team when the snapshot leaves the series out, e.g. while it follows the GFX Engine)
+            own = {"name": team.get("name") or "", "short": team.get("tricode") or team.get("short") or "",
+                   "score": team.get("wins") or 0, "color": team.get("color") or "", "logo": team.get("logo") or ""}
+            series[side] = dict(own, **{k: v for k, v in (series.get(side) or {}).items() if v not in (None, "")})
+        series.setdefault("best_of", (cfg.get("match") or {}).get("best_of") or cfg.get("best_of") or 3)
+        snap["series"] = series
+        snap.setdefault("event", cfg.get("event") or "")
+        snap.setdefault("stage", cfg.get("stage") or "")
+        return snap
+
     def stop(self):
+        if self.builder:
+            self.builder.stop()
         self.riot.stop()
         self._stop.set()
         self.reader.stop()
@@ -759,6 +780,12 @@ def make_handler(app):
             if not _is_local(self.client_address[0]) and not lan_feed:
                 return self._send('{"error":"Changes can only be made on the HUD PC"}', status=403)
             length = int(self.headers.get("Content-Length") or 0)
+            if path == "/api/custom-design":
+                # Custom design: HUD Builder, built in (hudbuilder/embed.py).
+                try:
+                    return self._send(json.dumps({"url": hud_builder.open_window(app.builder, "Custom design · VALORANT HUD")}))
+                except ValueError as e:
+                    return self._send(json.dumps({"error": str(e)}), status=400)
             if path.startswith("/api/engine/"):
                 # Connect to GFX Engine (see enginelink.py).
                 try:
@@ -916,6 +943,9 @@ def start(app):
     from . import fonts
     threading.Thread(target=fonts.installed, daemon=True).start()   # (the font list, ready for the panel)
     threading.Thread(target=app.run_poller, daemon=True).start()
+    # Custom design: design your own HUD (or bring in a .psd / .fig / .sccgfx) on this HUD's data.
+    app.builder = hud_builder.start("valorant", "VALORANT HUD", app._builder_snapshot, DATA_DIR,
+                                    host_url=lambda: f"http://127.0.0.1:{port}")
     log(f"VALORANT HUD {app.updater.current} running - control panel http://localhost:{port}/control")
     log(f"Overlay (browser source, 1920x1080): http://localhost:{port}/overlay")
     log(f"vMix data source: http://localhost:{port}/hud.csv  - file: {app.config.output_dir()}")
