@@ -66,6 +66,17 @@ class SeriesTests(unittest.TestCase):
         self.assertIsNone(self.series.stats)
         self.assertEqual(self.series.watch(state(0, 0), fields)["players"][0]["name"], "Bolt")
 
+    def test_sudden_death_overtime(self):
+        # A custom game with "win by two" off: 13-12 ends it, then agent select.
+        self.cfg.update({"best_of": 3, "current_map": 0})
+        for score in ((12, 12), (12, 13)):
+            self.series.watch(state(*score), {})
+        self.assertEqual(self.cfg.get()["right"]["wins"], 0)   # (could be win by two)
+        self.series.agent_select_started()
+        cfg = self.cfg.get()
+        self.assertEqual((cfg["maps"][0]["winner"], cfg["maps"][0]["score"]), ("right", {"left": 12, "right": 13}))
+        self.assertEqual((cfg["right"]["wins"], cfg["current_map"]), (1, 1))
+
     def test_a_misread_score_wins_nothing(self):
         self.series.watch(state(3, 2), {})
         self.series.watch(state(13, 2), {})

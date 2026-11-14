@@ -230,6 +230,13 @@ class Series:
         if self.won_at or not self._last_score:
             return
         left, right = self._last_score
+        if max(left, right) >= 13 and left != right:
+            # Already past 12-12 with a team ahead: a sudden-death overtime
+            # (the custom game's "win by two" off) ended at this score.
+            side = "left" if left > right else "right"
+            self.log(f"The map ended at {left}-{right} (sudden-death overtime): won by the team ahead")
+            self._map_won(side, (left, right), self.stats or {})
+            return
         ends = [side for side, score in (("left", (left + 1, right)), ("right", (left, right + 1)))
                 if map_winner(dict(zip(("left", "right"), score)))]
         if len(ends) == 1:
