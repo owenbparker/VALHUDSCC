@@ -16,7 +16,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
-from . import appearance, game, mapbans, outputs, recolor
+from . import appearance, game, mapbans, outputs, recolor, startpick
 from .teamsides import AttackFirst, Rosters, roster_flipped, swap_reading
 from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub, cam_links
@@ -799,6 +799,8 @@ def make_handler(app):
             path = url.path
             if appearance.handle(self, "GET", path, DATA_DIR):
                 return
+            if startpick.handle(self, "GET", path, DATA_DIR):
+                return
             fields = app.snapshot()["fields"]
             if path == "/":
                 self.send_response(302)
@@ -896,6 +898,8 @@ def make_handler(app):
             url = urlparse(self.path)
             path = url.path
             if appearance.handle(self, "POST", path, DATA_DIR):
+                return
+            if startpick.handle(self, "POST", path, DATA_DIR):
                 return
             if path in ("/api/cam/poll", "/api/cam/send", "/api/cam/list"):
                 length = int(self.headers.get("Content-Length") or 0)

@@ -12,5 +12,6 @@ sponsors/
 frames/
 certs/
 appearance.json
+start.json
 # Custom design's HUDs and settings (hudbuilder/embed.py)
 hud-builder/
