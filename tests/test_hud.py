@@ -253,6 +253,25 @@ class ReaderTests(unittest.TestCase):
         s["match"]["spike"]["state"] = "planted"
         up = game.round_won(s, {"match": {"score": {"left": 1, "right": 1}}})
         self.assertEqual(up["match"]["rounds"][-1], {"winner": "right", "win_type": "Deactivation"})
+        # Time: the defenders win, no plant, an attacker still standing.
+        s = game.merge(s, up)
+        s["match"]["spike"]["state"] = ""
+        for p in s["players"]:
+            p["agent"] = "Jett"
+            p["alive"] = not (p["team"] == "right" and p["slot"] == 1) and not (p["team"] == "left" and p["slot"] > 1)
+        up = game.round_won(s, {"match": {"score": {"left": 1, "right": 2}}})
+        self.assertEqual(up["match"]["rounds"][-1], {"winner": "right", "win_type": "Time"})
+        # Every defender down after the plant: an elimination, not a detonation.
+        s = game.merge(s, up)
+        s["match"]["spike"]["state"] = "planted"
+        for p in s["players"]:
+            p["alive"] = p["team"] == "left"
+        up = game.round_won(s, {"match": {"score": {"left": 2, "right": 2}}})
+        self.assertEqual(up["match"]["rounds"][-1], {"winner": "left", "win_type": "Elimination"})
+        s = game.merge(s, up)
+        s["match"]["spike"]["state"] = "detonated"
+        up = game.round_won(s, {"match": {"score": {"left": 3, "right": 2}}})
+        self.assertEqual(up["match"]["rounds"][-1], {"winner": "left", "win_type": "Detonation"})
         # Joined mid-match (no history to add to): left alone.
         s["match"]["score"] = {"left": 7, "right": 4}
         self.assertNotIn("rounds", game.round_won(s, {"match": {"score": {"left": 8, "right": 4}}})["match"])

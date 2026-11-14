@@ -1492,13 +1492,19 @@ class ScreenReader:
             return
         # A round on (one side +1) counts at its second read; anything else
         # (a score going down mid-map, a jump of several rounds: the usual
-        # misreads, "11" read as "1") needs five reads running. A new map
-        # (back near 0-0) and the first score seen count at two as before.
-        step = have is None or sum(key) <= 2 or (
+        # misreads, "11" read as "1") needs five reads running. The first
+        # score seen, a new map (back near 0-0 from a score the map could
+        # have ended at, or from the first rounds) and going back to the
+        # score before the last jump (one misread that got through) count at
+        # two: "12-11" read as "1-1" twice used to stick for five reads, and
+        # cut the round history down to two rounds.
+        step = have is None or key == getattr(self, "_score_before", None) or (
+            sum(key) <= 2 and (max(have) >= 12 or sum(have) <= 3)) or (
             sorted((key[0] - have[0], key[1] - have[1])) == [0, 1])
         self._score_seen = getattr(self, "_score_seen", 0) + 1 if key == getattr(self, "_score_pending", None) else 1
         self._score_pending = key
         if self._score_seen >= (2 if step else 5):
+            self._score_before = have
             self._score, self._score_pending, self._score_seen = key, None, 0
             return
         m.pop("score", None)

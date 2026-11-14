@@ -471,6 +471,26 @@ class ScoreMisreadTests(unittest.TestCase):
         self.assertIsNone(self._feed(r, 0, 0))      # the next map: second read
         self.assertEqual(self._feed(r, 0, 0), {"left": 0, "right": 0})
 
+    def test_a_drop_to_near_zero_mid_map(self):
+        from valhud.reader import ScreenReader
+        r = ScreenReader(lambda u: None)
+        self._feed(r, 6, 5)
+        self._feed(r, 6, 5)
+        # "6-5" read as "1-1" (or "0-0") mid-map: five reads, not two.
+        self.assertIsNone(self._feed(r, 1, 1))
+        self.assertIsNone(self._feed(r, 1, 1))
+        self.assertIsNone(self._feed(r, 1, 1))
+        # Once one got through, going back to the score before counts at two.
+        for _ in range(2):
+            self._feed(r, 1, 1)
+        self.assertIsNone(self._feed(r, 6, 5))
+        self.assertEqual(self._feed(r, 6, 5), {"left": 6, "right": 5})
+        # A new map after a won one: back to 0-0 at two reads.
+        for score in [(12, 5)] * 5 + [(13, 5)] * 2:
+            self._feed(r, *score)
+        self.assertIsNone(self._feed(r, 0, 0))
+        self.assertEqual(self._feed(r, 0, 0), {"left": 0, "right": 0})
+
 
 class SpectatedByCardFirstTests(unittest.TestCase):
     def test_card_agent_beats_a_misread_name(self):
@@ -538,6 +558,8 @@ class WholeMapFlowTests(unittest.TestCase):
             names = {(p["team"], p["slot"]): p["name"] for p in app.state["players"]}
             self.assertEqual(names[("left", 1)], "YorkA")
             self.assertEqual(names[("right", 3)], "SaintC")
+            # A timeout used, and a tech pause card left up.
+            app.config.update({"timeouts": {"left": 1, "right": 0}, "tech_pause": True})
             # Played out to 12-11, the last round never read; the next agent select.
             app.ingest({"source": "screen", "match": {"score": {"left": 12, "right": 11}}})
             app.ingest(dict(sel(saints, york, "right"), agent_select=dict(sel(saints, york, "right")["agent_select"], map="Bind")))
@@ -545,6 +567,8 @@ class WholeMapFlowTests(unittest.TestCase):
             self.assertEqual(cfg["maps"][0]["winner"], "left")
             self.assertEqual(cfg["left"]["wins"], 1)
             self.assertEqual(cfg["current_map"], 1)
+            # The new map: both teams' timeouts back, no card left up.
+            self.assertEqual((cfg["timeouts"], cfg["tech_pause"], cfg["timeout_call"]), ({"left": 2, "right": 2}, False, ""))
             self.assertEqual(app.state["players"][0]["kills"], 0)   # last map's data gone
             self.assertEqual(app.agent_select.view([])["players"]["left"][0]["name"], "YorkA")
 

@@ -92,8 +92,23 @@ def round_won(state, update):
     if len(up) != 1 or len(others) != 1 or len(rounds) != sum(old.get(side) or 0 for side in SIDES):
         return update
     winner, spike = up[0], (m.get("spike") or {}).get("state")
-    how = ("Detonation" if winner == m.get("attackers") else "Deactivation") if spike in ("planted", "defused", "detonated") \
-        else "Elimination"
+    attackers = m.get("attackers") or "left"
+    players = state.get("players") or []
+    seated = [p for p in players if p.get("agent") or p.get("name")]
+    alive = {side: sum(1 for p in seated if p.get("team") == side and p.get("alive")) for side in SIDES}
+    # (alive counts only while someone's dead: everyone back alive is the
+    # next round's buy phase, nothing to go by)
+    known = any(not p.get("alive") for p in seated)
+    loser = "right" if winner == "left" else "left"
+    if spike in ("planted", "defused", "detonated"):
+        if winner != attackers:
+            how = "Deactivation"
+        else:
+            # Every defender down before it went off ends the round there.
+            how = "Elimination" if spike != "detonated" and known and not alive[loser] else "Detonation"
+    else:
+        # The defenders running the clock down with attackers still alive.
+        how = "Time" if winner != attackers and known and alive[loser] else "Elimination"
     return dict(update, match=dict(update["match"], rounds=rounds + [{"winner": winner, "win_type": how}]))
 
 

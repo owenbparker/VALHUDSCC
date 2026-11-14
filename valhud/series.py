@@ -247,7 +247,10 @@ class Series:
         i = int(cfg.get("current_map") or 0)
         done = 0 <= i < len(maps) and bool(maps[i].get("winner"))
         if done and i + 1 < len(maps):
-            self.config.update({"current_map": i + 1})
+            # Each map starts with both teams' tactical timeouts back, and no
+            # timeout or tech pause card left up from the last one.
+            self.config.update({"current_map": i + 1, "timeouts": {"left": 2, "right": 2},
+                                "timeout_call": "", "tech_pause": False})
             self.log(f"Agent select: map {i + 2} ({maps[i + 1].get('name') or '?'}) is the current map")
         reset = done or self.cleared
         self.won_at, self.cleared, self.stats, self._last_score, self._won_score = 0.0, False, None, None, None
