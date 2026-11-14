@@ -223,6 +223,9 @@ def observed_by_agent(state, agent, side=None):
 def fields(state, cfg):
     """Flat name -> value fields for vMix / GT Title Designer (CSV, JSON, XML)."""
     m = state["match"]
+    # (a 2v2's empty seats 3-5 keep their defaults: alive, 800 credits)
+    size = 2 if cfg.get("team_size") == 2 else 5
+    playing = [p for p in state["players"] if p["slot"] <= size]
     f = {"CONNECTED": "LIVE" if state["connected"] else "WAITING", "MAP": m["map"], "ROUND": m["round"],
          "PHASE": m["phase"].upper(), "TIMER": f"{int(m['timer']) // 60}:{int(m['timer']) % 60:02d}",
          "SPIKE": m["spike"]["state"].upper(), "ROUND WINNER": m["round_winner"].upper(), "WIN TYPE": m["win_type"]}
@@ -235,8 +238,8 @@ def fields(state, cfg):
         f[f"SCORE {S}"] = m["score"][side]
         f[f"SERIES {S}"] = team.get("wins", 0)
         f[f"SIDE {S}"] = "ATK" if m["attackers"] == side else "DEF"
-        f[f"ALIVE {S}"] = sum(1 for p in state["players"] if p["team"] == side and p["alive"])
-        f[f"CREDITS {S}"] = sum(p["credits"] for p in state["players"] if p["team"] == side)
+        f[f"ALIVE {S}"] = sum(1 for p in playing if p["team"] == side and p["alive"])
+        f[f"CREDITS {S}"] = sum(p["credits"] for p in playing if p["team"] == side)
     for p in state["players"]:
         k = f"{p['team'].upper()} P{p['slot']}"
         f[f"{k} NAME"] = p["name"]

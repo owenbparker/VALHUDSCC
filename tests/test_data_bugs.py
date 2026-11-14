@@ -484,5 +484,18 @@ class SpectatedByCardFirstTests(unittest.TestCase):
             self.assertEqual(app.state["match"]["observed"], {"team": "right", "slot": 5})
 
 
+class TwoATeamFieldsTests(unittest.TestCase):
+    def test_alive_and_credits_count_only_the_two(self):
+        from valhud.config import DEFAULTS
+        import copy
+        cfg = copy.deepcopy(DEFAULTS)
+        cfg["team_size"] = 2
+        s = game.merge(game.empty_state(), {"players": [{"team": "left", "slot": 1, "health": 0, "credits": 1000},
+                                                        {"team": "left", "slot": 2, "credits": 2000}]})
+        f = game.fields(s, cfg)
+        self.assertEqual(f["ALIVE LEFT"], 1)
+        self.assertEqual(f["CREDITS LEFT"], 3000)
+
+
 if __name__ == "__main__":
     unittest.main()
