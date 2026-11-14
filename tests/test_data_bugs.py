@@ -506,5 +506,48 @@ class RiotDoesntMakeItLiveTests(unittest.TestCase):
             self.assertEqual(app.state["match"]["map"], "Bind")
 
 
+class WholeMapFlowTests(unittest.TestCase):
+    """Two maps end to end: Riot Client agent select with the screen alongside,
+    the match, the map won, the next agent select."""
+
+    def test_two_maps(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp, attack_first="left", left={"name": "York"}, right={"name": "Saints"},
+                           maps=[{"name": "Lotus", "winner": ""}, {"name": "Bind", "winner": ""}], current_map=0)
+            york = [("YorkA", "Killjoy"), ("YorkB", "Omen"), ("YorkC", "Jett")]
+            saints = [("SaintA", "Sova"), ("SaintB", "Raze"), ("SaintC", "Viper")]
+            # Agent select: the observer PC's Riot Client (its own setting says right attacks first).
+            sel = lambda team_l, team_r, af: {"source": "riot", "agent_select": {
+                "active": True, "map": "Lotus", "attack_first": af, "players":
+                [{"team": "left", "slot": i + 1, "agent": a, "locked": True, "name": n} for i, (n, a) in enumerate(team_l)] +
+                [{"team": "right", "slot": i + 1, "agent": a, "locked": True, "name": n} for i, (n, a) in enumerate(team_r)]}}
+            app.ingest(sel(saints, york, "right"))   # (red = right there: York's on its "right")
+            v = app.agent_select.view([])["players"]
+            self.assertEqual([p["name"] for p in v["left"][:3]], ["YorkA", "YorkB", "YorkC"])
+            # The screen alongside doesn't mix in.
+            app.ingest({"source": "screen", "agent_select": {"active": True, "players": [
+                {"team": "attackers", "slot": 1, "agent": "", "locked": False}]}})
+            self.assertEqual(app.agent_select.view([])["players"]["left"][0]["agent"], "Killjoy")
+            app.ingest({"source": "riot", "agent_select": {"active": False}})
+            # The match: top bar agents, Riot roster from the observer PC.
+            players = [{"team": "left", "slot": i + 1, "agent": a} for i, (_, a) in enumerate(york)] + \
+                      [{"team": "right", "slot": i + 1, "agent": a} for i, (_, a) in enumerate(saints)]
+            app.ingest({"source": "screen", "players": players, "match": {"attackers": "left", "score": {"left": 0, "right": 0}}})
+            app.ingest({"source": "riot", "attack_first": "right", "riot_roster": {
+                "left": [{"name": n, "agent": a} for n, a in saints], "right": [{"name": n, "agent": a} for n, a in york]}})
+            names = {(p["team"], p["slot"]): p["name"] for p in app.state["players"]}
+            self.assertEqual(names[("left", 1)], "YorkA")
+            self.assertEqual(names[("right", 3)], "SaintC")
+            # Played out to 12-11, the last round never read; the next agent select.
+            app.ingest({"source": "screen", "match": {"score": {"left": 12, "right": 11}}})
+            app.ingest(dict(sel(saints, york, "right"), agent_select=dict(sel(saints, york, "right")["agent_select"], map="Bind")))
+            cfg = app.config.get()
+            self.assertEqual(cfg["maps"][0]["winner"], "left")
+            self.assertEqual(cfg["left"]["wins"], 1)
+            self.assertEqual(cfg["current_map"], 1)
+            self.assertEqual(app.state["players"][0]["kills"], 0)   # last map's data gone
+            self.assertEqual(app.agent_select.view([])["players"]["left"][0]["name"], "YorkA")
+
+
 if __name__ == "__main__":
     unittest.main()
