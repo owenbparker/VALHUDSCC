@@ -419,5 +419,35 @@ class KdaDoubleCountTests(unittest.TestCase):
         self.assertEqual(k.values(v), (0, 1, 0))
 
 
+class ScannedNamesByAgentTests(unittest.TestCase):
+    """Scan names put the names in as typed names by seat: next map, other
+    players sat in those seats and kept last map's names."""
+
+    def test_scanned_names_follow_agents_and_end_at_agent_select(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp)
+            app.ingest({"source": "screen", "players": [{"team": "left", "slot": 1, "agent": "Jett"},
+                                                        {"team": "left", "slot": 2, "agent": "Sova"}]})
+            app.reader.scan_names = lambda: ({"left": {1: "JettPlayer", 2: "SovaPlayer"}, "right": {}}, [])
+            import json
+            import urllib.request
+            from valhud.app import start
+            app.config.update({"http_port": 8823})
+            start(app)
+            try:
+                req = urllib.request.Request("http://127.0.0.1:8823/api/reader/names", b"{}",
+                                             {"Content-Type": "application/json"})
+                json.loads(urllib.request.urlopen(req, timeout=5).read())
+            finally:
+                app.stop()
+            # Seats swap round: the names stay with the agents.
+            app.ingest({"source": "screen", "players": [{"team": "left", "slot": 1, "agent": "Sova"},
+                                                        {"team": "left", "slot": 2, "agent": "Jett"}]})
+            self.assertEqual([p["name"] for p in app.state["players"][:2]], ["SovaPlayer", "JettPlayer"])
+            self.assertEqual(app.config.get()["player_names"]["left"], [""] * 5)
+            app.ingest({"source": "screen", "agent_select": {"active": True, "players": []}})
+            self.assertEqual(app.config.get()["scanned_names"], [])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -100,6 +100,8 @@ class HudApp:
             # deaths to the new map's first reads).
             self.series.agent_select_started()
             self.feed.apply({"source": "agent select", "reset": True})
+            if self.config.get().get("scanned_names"):
+                self.config.update({"scanned_names": []})   # (last map's, by agent)
         if new_map and source != "demo":
             cfg = self.config.get()
             maps = [dict(m) for m in cfg.get("maps") or []]
@@ -312,6 +314,11 @@ class HudApp:
                 match = [q["name"] for q in roster.get(p["team"]) or [] if q.get("agent") == p["agent"] and q.get("name")]
                 if len(match) == 1:
                     p["name"] = match[0]
+                    continue
+            scan = next((q.get("name") for q in cfg.get("scanned_names") or []
+                         if isinstance(q, dict) and q.get("team") == p["team"] and q.get("agent") == p.get("agent")), None)
+            if scan and not (p["slot"] <= len(own) and str(own[p["slot"] - 1]).strip()):
+                p["name"] = scan   # (Scan names, read carefully off the Tab scoreboard)
             if not p.get("name") and p.get("agent"):
                 match = [q["name"] for q in picks.get(p["team"], []) if q.get("agent") == p["agent"] and q.get("name")]
                 if len(match) == 1:
@@ -568,6 +575,8 @@ class HudApp:
             "timeouts": {"left": cfg["timeouts"]["right"], "right": cfg["timeouts"]["left"]},
             "timeout_call": flip.get(cfg.get("timeout_call"), ""),
             "player_names": {"left": names.get("right") or [""] * 5, "right": names.get("left") or [""] * 5},
+            "scanned_names": [dict(q, team=flip.get(q.get("team"), q.get("team"))) for q in cfg.get("scanned_names") or []
+                              if isinstance(q, dict)],
             "attack_first": flip.get(cfg.get("attack_first"), "right"),
             "map_bans": {"team_a": flip.get((cfg.get("map_bans") or {}).get("team_a"), "right")}})
         log(f"Sides swapped: {cfg['right']['name'] or 'right team'} on the left")
@@ -925,10 +934,16 @@ def make_handler(app):
                     if app.config.get().get("team_size") == 2:
                         names = {side: {game.SEATS_2V2[(side, seat)]: name for seat, name in seats.items()
                                         if (side, seat) in game.SEATS_2V2} for side, seats in names.items()}
-                    current = app.config.get()["player_names"]
-                    new = {side: [names[side].get(i + 1) or current[side][i] for i in range(5)] for side in ("left", "right")}
-                    app.config.update({"player_names": new})
-                    found = sum(len(v) for v in names.values())
+                    # Kept by agent, not seat (they used to go in as typed names
+                    # by seat, and stayed on those seats the next map, where
+                    # other players sit): until the next agent select.
+                    with app._lock:
+                        agents = {(p["team"], p["slot"]): p.get("agent") for p in app.state["players"]}
+                    # (a list: the config's dicts merge, a list replaces)
+                    scanned = [{"team": side, "agent": agents[(side, seat)], "name": name}
+                               for side, seats in names.items() for seat, name in seats.items() if agents.get((side, seat))]
+                    app.config.update({"scanned_names": scanned})
+                    found = len(scanned)
                     log(f"Scanned names: {found} of {2 * (app.config.get().get('team_size') or 5)} placed"
                         + (f"; couldn't tell whose: {', '.join(missed)}" if missed else ""))
                     app.last_scan = {"found": found, "missed": missed}

@@ -59,6 +59,9 @@ DEFAULTS = {
     "tech_pause": False,
     # Player names to show, per team, in slot order (overrides the feed).
     "player_names": {"left": ["", "", "", "", ""], "right": ["", "", "", "", ""]},
+    # Names from Scan names (the Tab scoreboard, read carefully), by team and
+    # agent, until the next agent select: [{"team", "agent", "name"}].
+    "scanned_names": [],
     # Timeout diamonds under the score; keep the scoreboard overlay on screen.
     "show": {"timeouts": True, "scoreboard": False},
     # Player webcams (SCC Player Cam): the spectated player's cam pops up

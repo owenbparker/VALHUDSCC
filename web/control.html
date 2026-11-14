@@ -236,8 +236,8 @@
     <h2>Players</h2>
     <p class="note" style="margin:0 0 8px">Names typed here replace the ones from the game. Leave blank to use the game's.</p>
     <div class="row" style="margin:0 0 10px">
-      <button id="scan-names" style="flex:0 0 auto" title="Reads every name off VALORANT's Tab scoreboard carefully and fills them in below, each by its player's agent">Scan names</button>
-      <span class="note" id="scan-result" style="margin:0">With the Tab scoreboard open in VALORANT (it's up in the buy phase): fills in every player's name from the game.</span>
+      <button id="scan-names" style="flex:0 0 auto" title="Reads every name off VALORANT's Tab scoreboard carefully; each shows on the HUD by its player's agent until the next agent select">Scan names</button>
+      <span class="note" id="scan-result" style="margin:0">With the Tab scoreboard open in VALORANT (it's up in the buy phase): reads every player's name from the game and shows it on the HUD by their agent, until the next agent select. Names typed below still win.</span>
     </div>
     <div class="players"><div id="players-left"></div><div id="players-right"></div></div>
   </section>
@@ -555,7 +555,7 @@ $("scan-names").onclick = async () => {
   finally { $("scan-names").disabled = false; }
   if (data.error) { $("scan-result").textContent = "Couldn't scan: " + data.error; return; }
   const scan = state && state.app.scan;
-  if (scan) $("scan-result").textContent = `Filled in ${scan.found} of 10.`
+  if (scan) $("scan-result").textContent = `Read ${scan.found} of 10 names (shown by agent until the next agent select).`
     + (scan.missed.length ? ` Couldn't tell whose: ${scan.missed.join(", ")} (agent not recognised yet): type those in.` : "");
 };
 $("tech-pause").onclick = () => post("/api/config", { tech_pause: !state.config.tech_pause, timeout_call: "" });
