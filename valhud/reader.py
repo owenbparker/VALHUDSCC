@@ -266,10 +266,18 @@ def top_portrait(frame, side, slot):
 
 def _tint(frame, x0, y0, x1, y1):
     """(teal, red) fractions of a box's pixels."""
-    data = _pixels(frame.crop(x0, y0, x1, y1))
-    teal = sum(1 for p in data if p[1] > p[0] + 30 and p[2] > p[0] + 15)
-    red = sum(1 for p in data if p[0] > p[1] + 40 and p[0] > p[2] + 30)
-    return teal / max(1, len(data)), red / max(1, len(data))
+    try:
+        np = _np()
+    except ImportError:
+        data = _pixels(frame.crop(x0, y0, x1, y1))
+        teal = sum(1 for p in data if p[1] > p[0] + 30 and p[2] > p[0] + 15)
+        red = sum(1 for p in data if p[0] > p[1] + 40 and p[0] > p[2] + 30)
+        return teal / max(1, len(data)), red / max(1, len(data))
+    a = np.asarray(frame.crop(x0, y0, x1, y1).convert("RGB"), dtype=np.int16).reshape(-1, 3)
+    if not len(a):
+        return 0.0, 0.0
+    r, g, b = a[:, 0], a[:, 1], a[:, 2]
+    return float(((g > r + 30) & (b > r + 15)).mean()), float(((r > g + 40) & (r > b + 30)).mean())
 
 
 def select_header(frame):
