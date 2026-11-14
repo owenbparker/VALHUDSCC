@@ -305,8 +305,24 @@ class HudApp:
             # say they're the other way round)
             roster = {"left": roster.get("right") or [], "right": roster.get("left") or []}
         typed = cfg.get("player_names") or {}
+        from .teamsides import norm
         for p in state["players"]:
-            own = (typed.get(p["team"]) or [""] * 5)
+            own = list(typed.get(p["team"]) or [""] * 5)
+            mine = str(own[p["slot"] - 1]).strip() if p["slot"] <= len(own) else ""
+            if mine and roster and p.get("agent"):
+                # A typed name that's another seat's player (by the Riot
+                # Client: the player on another agent): typed by seat for
+                # last map, where other players sit now. That seat shows its
+                # own player instead.
+                others = {norm(q.get("name")) for q in roster.get(p["team"]) or [] if q.get("agent") != p["agent"]}
+                if norm(mine) in others:
+                    own[p["slot"] - 1] = ""
+                    raw_p = next((q for q in raw["players"] if (q["team"], q["slot"]) == (p["team"], p["slot"])), {})
+                    p["name"] = raw_p.get("name") or ""   # (the feed's, not the typed one)
+                    if not getattr(self, "_typed_warned", {}).get((p["team"], p["slot"])) == mine:
+                        self.__dict__.setdefault("_typed_warned", {})[(p["team"], p["slot"])] = mine
+                        log(f"The name typed for {p['team']} player {p['slot']} ({mine}) is another player's in this "
+                            f"match: that seat shows its own player (retype the names in Players & Teams)", "warn")
             if p.get("agent") and roster and not (p["slot"] <= len(own) and str(own[p["slot"] - 1]).strip()):
                 # The Riot Client's roster: the Riot ID of the player on that
                 # agent (exact, so it wins over a name read off the screen;

@@ -549,5 +549,17 @@ class WholeMapFlowTests(unittest.TestCase):
             self.assertEqual(app.agent_select.view([])["players"]["left"][0]["name"], "YorkA")
 
 
+class TypedNamesOnOtherSeatsTests(unittest.TestCase):
+    def test_typed_name_of_another_seats_player_gives_way(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp, player_names={"left": ["YorkB", "Nick", "", "", ""], "right": [""] * 5})
+            app.ingest({"source": "screen", "players": [{"team": "left", "slot": 1, "agent": "Killjoy"},
+                                                        {"team": "left", "slot": 2, "agent": "Omen"}]})
+            app.ingest({"source": "riot", "riot_roster": {"left": [{"name": "YorkA", "agent": "Killjoy"},
+                                                                   {"name": "YorkB", "agent": "Omen"}], "right": []}})
+            names = [p["name"] for p in app.state["players"][:2]]
+            self.assertEqual(names, ["YorkA", "Nick"])   # (a typed nickname that's no one else's stays)
+
+
 if __name__ == "__main__":
     unittest.main()
