@@ -42,7 +42,9 @@ WEAPONS = {"Classic": 0, "Shorty": 300, "Frenzy": 450, "Ghost": 500, "Sheriff": 
            "Spectre": 1600, "Bucky": 850, "Judge": 1850, "Bulldog": 2050, "Guardian": 2250, "Phantom": 2900,
            "Vandal": 2900, "Marshal": 950, "Outlaw": 2400, "Operator": 4700, "Ares": 1600, "Odin": 3200,
            # Added to the game in 2025; its HUD image is traced from a spectator frame.
-           "Bandit": 600}
+           "Bandit": 600,
+           # A rifle added later (2026); its image is the game's own kill-feed icon (valorant-api.com).
+           "Warden": 2900}
 
 _AGENT_LOOKUP = {a.lower(): a for a in AGENTS} | {"kay/o": "Kayo", "kay-o": "Kayo", "kayo": "Kayo"}
 _WEAPON_LOOKUP = {w.lower(): w for w in WEAPONS} | {"melee": "Knife", "knife": "Knife"}
