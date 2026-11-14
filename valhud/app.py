@@ -327,8 +327,12 @@ class HudApp:
             self.rosters.learn(state, cfg)
         text, at, agent, side = self.spectating
         if time.time() - at < self.SPECTATING_FOR:
-            state["match"]["observed"] = (game.observed_player(state, text)
-                                          or game.observed_by_agent(state, agent, side))
+            # The card's portrait (agent and side) is certain; the name is
+            # read text (and the HUD's names can be read wrong too), so it
+            # only decides when the agent doesn't (no card, or two players
+            # on that agent).
+            state["match"]["observed"] = (game.observed_by_agent(state, agent, side)
+                                          or game.observed_player(state, text))
         self.series.round_kills(state)
         if self.mode == "live" and fetch:
             self.series.sync_maps()

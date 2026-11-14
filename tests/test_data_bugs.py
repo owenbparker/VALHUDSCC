@@ -449,5 +449,40 @@ class ScannedNamesByAgentTests(unittest.TestCase):
             self.assertEqual(app.config.get()["scanned_names"], [])
 
 
+class ScoreMisreadTests(unittest.TestCase):
+    def _feed(self, r, left, right):
+        u = {"match": {"score": {"left": left, "right": right}, "round": left + right + 1}}
+        r._steady_score(u)
+        return u["match"].get("score")
+
+    def test_a_dropped_digit_read_twice_doesnt_count(self):
+        from valhud.reader import ScreenReader
+        r = ScreenReader(lambda u: None)
+        self._feed(r, 11, 9)
+        self.assertEqual(self._feed(r, 11, 9), {"left": 11, "right": 9})
+        self.assertIsNone(self._feed(r, 1, 9))      # "11" read as "1"
+        self.assertIsNone(self._feed(r, 1, 9))      # twice: still not
+        self.assertEqual(self._feed(r, 11, 9), {"left": 11, "right": 9})
+        self.assertIsNone(self._feed(r, 12, 9))     # a round on: second read
+        self.assertEqual(self._feed(r, 12, 9), {"left": 12, "right": 9})
+        for _ in range(4):                          # a real jump (joined late, a missed read): five reads
+            self.assertIsNone(self._feed(r, 14, 12))
+        self.assertEqual(self._feed(r, 14, 12), {"left": 14, "right": 12})
+        self.assertIsNone(self._feed(r, 0, 0))      # the next map: second read
+        self.assertEqual(self._feed(r, 0, 0), {"left": 0, "right": 0})
+
+
+class SpectatedByCardFirstTests(unittest.TestCase):
+    def test_card_agent_beats_a_misread_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp)
+            app.ingest({"source": "test", "match": {"attackers": "right"},
+                        "players": [{"team": "right", "slot": 5, "agent": "Cypher", "name": "Gora46"},
+                                    {"team": "left", "slot": 1, "agent": "Jett", "name": "Gora4"}]})
+            # The camera's just cut to the Cypher; the name read is the last one's (or misread).
+            app.ingest({"source": "observer", "spectating": {"text": "Gora4", "agent": "Cypher", "side": "attackers"}})
+            self.assertEqual(app.state["match"]["observed"], {"team": "right", "slot": 5})
+
+
 if __name__ == "__main__":
     unittest.main()

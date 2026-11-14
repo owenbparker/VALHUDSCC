@@ -1478,12 +1478,21 @@ class ScreenReader:
         if not score:
             return
         key = (score["left"], score["right"])
-        if key == getattr(self, "_score", None):
+        have = getattr(self, "_score", None)
+        if key == have:
+            self._score_pending, self._score_seen = None, 0
             return
-        if key == getattr(self, "_score_pending", None):
-            self._score = key
-            return
+        # A round on (one side +1) counts at its second read; anything else
+        # (a score going down mid-map, a jump of several rounds: the usual
+        # misreads, "11" read as "1") needs five reads running. A new map
+        # (back near 0-0) and the first score seen count at two as before.
+        step = have is None or sum(key) <= 2 or (
+            sorted((key[0] - have[0], key[1] - have[1])) == [0, 1])
+        self._score_seen = getattr(self, "_score_seen", 0) + 1 if key == getattr(self, "_score_pending", None) else 1
         self._score_pending = key
+        if self._score_seen >= (2 if step else 5):
+            self._score, self._score_pending, self._score_seen = key, None, 0
+            return
         m.pop("score", None)
         m.pop("round", None)
 
