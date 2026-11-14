@@ -1481,6 +1481,27 @@ class ScreenReader:
         m.pop("score", None)
         m.pop("round", None)
 
+    def _steady_names(self, update):
+        """A seat's name off the scoreboard counts once it's been read the
+        same twice (one misread, "chr" for "chronicle", used to show until
+        the next read); the name it had stays meanwhile."""
+        names = self.__dict__.setdefault("_seat_names", {})
+        for p in update["players"]:
+            text = p.pop("name", None)
+            if not text:
+                continue
+            seat = (p["team"], p["slot"])
+            have, pending = names.get(seat, (None, None))
+            if text == have:
+                p["name"] = text
+            elif text == pending:
+                names[seat] = (text, None)
+                p["name"] = text
+            else:
+                names[seat] = (have, text)
+                if have:
+                    p["name"] = have
+
     def _learn_agents(self, update):
         """An agent counts once it's been seen three times in the same seat on
         the top bar (the scoreboard's rows are in score order, so they don't
@@ -1511,6 +1532,7 @@ class ScreenReader:
                     # put last map's agents on this map's seats until
                     # learned again)
                     self.agents, self._agent_votes = {}, {}
+                    self._seat_names = {}
                     if self.select.empty_for() > 20:
                         self._keep_frame(image, "agent-select-unread")
                     elif self.select.unread_for() > 8:
@@ -1530,6 +1552,7 @@ class ScreenReader:
                     fresh = {(t, s_): a for t, s_, a in update.get("seen_agents", [])}
                     self._learn_agents(update)
                     self._steady_score(update)
+                    self._steady_names(update)
                     board = set()
                     if update["match"].get("scoreboard_open"):
                         for p in update["players"]:

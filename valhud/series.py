@@ -40,6 +40,23 @@ def maps_from_bans(cfg):
     return [{"name": s["map"], "picked_by": s["team"] if s["action"] == "pick" else ""} for s in chosen]
 
 
+def attack_first_from_bans(cfg, index):
+    """"left" / "right": who attacks first on the series' map `index`, from
+    the side picked for it in Map Bans (when it's that map and a side's set)."""
+    bo = int(cfg.get("best_of") or 3)
+    if bo not in (1, 3):
+        return None
+    chosen = [s for s in mapbans.steps(cfg, f"bo{bo}") if s["action"] in ("pick", "decider")]
+    maps = cfg.get("maps") or []
+    if not 0 <= index < len(chosen) or index >= len(maps) or chosen[index]["map"] != maps[index].get("name"):
+        return None
+    step = chosen[index]
+    if step["side"] not in ("attack", "defence") or step["side_team"] not in ("left", "right"):
+        return None
+    other = "right" if step["side_team"] == "left" else "left"
+    return step["side_team"] if step["side"] == "attack" else other
+
+
 def wins_needed(cfg):
     return int(cfg.get("best_of") or 3) // 2 + 1
 
@@ -54,6 +71,7 @@ class Series:
         self.cleared = False       # the in-game HUD is cleared (after a won map)
         self.stats = None          # the fields kept for the stats while cleared
         self._last_score = None
+        self._won_score = None     # the score the current map was won at
         self._bans = None
         self._round = None
         self._round_kills = {}     # (team, slot) -> kills at the start of the round
@@ -64,7 +82,20 @@ class Series:
     # --- Map Bans -> maps -----------------------------------------------------
 
     def sync_maps(self):
-        """Take the maps from Map Bans when they change there."""
+        """Take the maps from Map Bans when they change there (and who
+        attacks first on the current map, from its side pick)."""
+        self._sync_maps()
+        cfg = self.config.get()
+        i = int(cfg.get("current_map") or 0)
+        side = attack_first_from_bans(cfg, i)
+        key = (i, side)
+        if key != getattr(self, "_side_key", None):
+            self._side_key = key
+            if side and side != cfg.get("attack_first"):
+                self.config.update({"attack_first": side})
+                self.log(f"Map {i + 1}: {cfg[side]['name'] or side} attacks first (the side picked in Map Bans)")
+
+    def _sync_maps(self):
         cfg = self.config.get()
         picked = maps_from_bans(cfg)
         key = repr(picked)
@@ -139,6 +170,16 @@ class Series:
         # score mustn't win a map).
         if winner and before and sum(now) == sum(before) + 1 and not map_winner(dict(zip(("left", "right"), before))):
             self._map_won(winner, now, fields)
+        if self.won_at and state.get("connected") and sum(now) < 3 and before and sum(now) < sum(before) \
+                and self._won_score and sum(now) < sum(self._won_score):
+            # The next map is being played (its score back near 0-0) without
+            # its agent select seen (the reader was off, or only the Riot
+            # Client saw it): it's the current map now, and the HUD shows it
+            # (it stayed cleared all map otherwise).
+            self.log("A new map's score: the next map has started")
+            self.agent_select_started()
+            self._last_score = now
+            return state
         if not self.cleared and self.won_at and time.time() - self.won_at >= CLEAR_AFTER:
             self.cleared = True
             self.log("Map over a minute ago: the in-game HUD is cleared (stats kept until agent select)")
@@ -159,6 +200,7 @@ class Series:
         wins = min(wins_needed(cfg), int(cfg[winner].get("wins") or 0) + 1)
         self.config.update({"maps": maps, winner: {"wins": wins}})
         self.won_at = time.time()
+        self._won_score = score
         self.stats = dict(fields)
         self.log(f"Map {i + 1} ({maps[i].get('name') or '?'}) won by {cfg[winner]['tricode']} "
                  f"{score[0]}-{score[1]}: series {cfg['left']['tricode']} "
@@ -177,5 +219,5 @@ class Series:
             self.config.update({"current_map": i + 1})
             self.log(f"Agent select: map {i + 2} ({maps[i + 1].get('name') or '?'}) is the current map")
         reset = done or self.cleared
-        self.won_at, self.cleared, self.stats, self._last_score = 0.0, False, None, None
+        self.won_at, self.cleared, self.stats, self._last_score, self._won_score = 0.0, False, None, None, None
         return reset
