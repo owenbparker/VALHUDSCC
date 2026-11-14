@@ -104,7 +104,14 @@ class HudApp:
             cfg = self.config.get()
             maps = [dict(m) for m in cfg.get("maps") or []]
             i = int(cfg.get("current_map") or 0)
-            if 0 <= i < len(maps) and maps[i].get("name") != new_map:
+            later = next((j for j in range(i + 1, len(maps)) if maps[j].get("name") == new_map), None)
+            if 0 <= i < len(maps) and maps[i].get("name") != new_map and later is not None \
+                    and not any(maps[j].get("winner") for j in range(i + 1, len(maps))):
+                # The series' next map (the last one's win wasn't seen):
+                # it's the current one, rather than renaming the last.
+                self.config.update({"current_map": later})
+                log(f"Agent select: the map is {new_map}, map {later + 1} of the series, now the current map")
+            elif 0 <= i < len(maps) and maps[i].get("name") != new_map:
                 maps[i]["name"] = new_map
                 self.config.update({"maps": maps})
                 log(f"Agent select: the map is {new_map} (map {i + 1} of the series)")

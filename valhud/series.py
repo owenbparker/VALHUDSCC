@@ -64,6 +64,8 @@ def wins_needed(cfg):
 class Series:
     """Watches the live match (see HudApp.refresh) and moves the series on."""
 
+    NEW_MAP_AFTER = 15.0   # seconds a score back near 0-0 must hold to be the next map (not a misread)
+
     def __init__(self, config, log):
         self.config = config
         self.log = log
@@ -72,6 +74,7 @@ class Series:
         self.stats = None          # the fields kept for the stats while cleared
         self._last_score = None
         self._won_score = None     # the score the current map was won at
+        self._low = None           # (since when, last map's score): the score's been back near 0-0
         self._bans = None
         self._round = None
         self._round_kills = {}     # (team, slot) -> kills at the start of the round
@@ -170,13 +173,20 @@ class Series:
         # score mustn't win a map).
         if winner and before and sum(now) == sum(before) + 1 and not map_winner(dict(zip(("left", "right"), before))):
             self._map_won(winner, now, fields)
-        if self.won_at and state.get("connected") and sum(now) < 3 and before and sum(now) < sum(before) \
-                and self._won_score and sum(now) < sum(self._won_score):
+        last = self._won_score or before
+        if sum(now) >= 3:
+            self._low = None
+        elif not self._low and before and sum(now) < sum(before) and last and sum(last) >= 12 \
+                and sum(now) < sum(last) - 5 and (self.won_at or self._ended(before)):
+            self._low = (time.time(), before)   # (the score before the drop)
+        if self._low and time.time() - self._low[0] >= self.NEW_MAP_AFTER and state.get("connected"):
+            before, self._low = self._low[1], None
             # The next map is being played (its score back near 0-0) without
             # its agent select seen (the reader was off, or only the Riot
             # Client saw it): it's the current map now, and the HUD shows it
             # (it stayed cleared all map otherwise).
             self.log("A new map's score: the next map has started")
+            self._last_score = before   # (the last map's last score, for a last round never read)
             self.agent_select_started()
             self._last_score = now
             return state
@@ -207,10 +217,31 @@ class Series:
                  f"{wins if winner == 'left' else cfg['left'].get('wins', 0)}-"
                  f"{wins if winner == 'right' else cfg['right'].get('wins', 0)} {cfg['right']['tricode']}")
 
+    @staticmethod
+    def _ended(score):
+        """Could the map have ended a round after this score?"""
+        left, right = score
+        return bool(map_winner({"left": left + 1, "right": right}) or map_winner({"left": left, "right": right + 1}))
+
+    def _last_round_missed(self):
+        """The map's over (the next one's starting) but its last round was
+        never read (the end screen came up before the score was read twice):
+        from match point, only one team can have ended it."""
+        if self.won_at or not self._last_score:
+            return
+        left, right = self._last_score
+        ends = [side for side, score in (("left", (left + 1, right)), ("right", (left, right + 1)))
+                if map_winner(dict(zip(("left", "right"), score)))]
+        if len(ends) == 1:
+            score = (left + 1, right) if ends[0] == "left" else (left, right + 1)
+            self.log(f"The map ended at {left}-{right} without its last round read: won {score[0]}-{score[1]}")
+            self._map_won(ends[0], score, self.stats or {})
+
     def agent_select_started(self):
         """The next map's agent select: it's the current map now, and the
         last map's HUD and stats are done with. Returns True when the match
         data should start again from empty."""
+        self._last_round_missed()
         cfg = self.config.get()
         maps = cfg.get("maps") or []
         i = int(cfg.get("current_map") or 0)
@@ -220,4 +251,5 @@ class Series:
             self.log(f"Agent select: map {i + 2} ({maps[i + 1].get('name') or '?'}) is the current map")
         reset = done or self.cleared
         self.won_at, self.cleared, self.stats, self._last_score, self._won_score = 0.0, False, None, None, None
+        self._low = None
         return reset

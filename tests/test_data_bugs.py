@@ -235,6 +235,9 @@ class NextMapWithoutAgentSelectTests(unittest.TestCase):
             self.assertTrue(app.series.cleared)
             app.ingest({"source": "screen", "match": {"score": {"left": 0, "right": 0}},
                         "players": [{"team": "left", "slot": 1, "agent": "Jett"}]})
+            self.assertTrue(app.series.cleared)   # (not on one reading)
+            app.series._low = (app.series._low[0] - 20, app.series._low[1])
+            app.refresh()
             self.assertFalse(app.series.cleared)
             self.assertEqual(app.config.get()["current_map"], 1)
             self.assertEqual(app.state["players"][0]["agent"], "Jett")
@@ -334,6 +337,54 @@ class AgentSelectNameCutShortTests(unittest.TestCase):
                 names[k] = 0   # (as if two seconds had passed)
             selectreader.read(img, ocr, names, layout)
         self.assertEqual(names[("defenders", 0)], "Juwan")
+
+
+class NextMapByNameTests(unittest.TestCase):
+    def test_agent_select_on_the_next_map_moves_on(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp, maps=[{"name": "Lotus", "winner": ""}, {"name": "Bind", "winner": ""},
+                                      {"name": "Haven", "winner": ""}], current_map=0)
+            app.ingest({"source": "screen", "agent_select": {"active": True, "map": "Bind", "players": []}})
+            cfg = app.config.get()
+            self.assertEqual(cfg["current_map"], 1)
+            self.assertEqual([m["name"] for m in cfg["maps"]], ["Lotus", "Bind", "Haven"])
+            # A map not in the series still renames the current one.
+            app.agent_select.clear()
+            app.ingest({"source": "screen", "agent_select": {"active": True, "map": "Sunset", "players": []}})
+            self.assertEqual(app.config.get()["maps"][1]["name"], "Sunset")
+
+
+class LastRoundMissedTests(unittest.TestCase):
+    def test_match_point_then_next_agent_select_wins_the_map(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp, maps=[{"name": "Lotus", "winner": ""}, {"name": "Bind", "winner": ""}], current_map=0,
+                           right={"wins": 0})
+            app.ingest({"source": "screen", "match": {"score": {"left": 10, "right": 12}}})
+            app.ingest({"source": "screen", "agent_select": {"active": True, "players": []}})
+            cfg = app.config.get()
+            self.assertEqual(cfg["maps"][0]["winner"], "right")
+            self.assertEqual(cfg["maps"][0]["score"], {"left": 10, "right": 13})
+            self.assertEqual(cfg["right"]["wins"], 1)
+            self.assertEqual(cfg["current_map"], 1)
+
+    def test_not_at_match_point_left_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp, maps=[{"name": "Lotus", "winner": ""}, {"name": "Bind", "winner": ""}], current_map=0)
+            app.ingest({"source": "screen", "match": {"score": {"left": 12, "right": 12}}})
+            app.ingest({"source": "screen", "agent_select": {"active": True, "players": []}})
+            self.assertEqual(app.config.get()["maps"][0]["winner"], "")
+
+    def test_match_point_then_new_maps_score(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp, maps=[{"name": "Lotus", "winner": ""}, {"name": "Bind", "winner": ""}], current_map=0)
+            app.ingest({"source": "screen", "match": {"score": {"left": 12, "right": 11}}})
+            app.ingest({"source": "screen", "match": {"score": {"left": 0, "right": 0}}})
+            self.assertEqual(app.config.get()["maps"][0]["winner"], "")   # (not on one reading)
+            app.series._low = (app.series._low[0] - 20, app.series._low[1])
+            app.refresh()
+            cfg = app.config.get()
+            self.assertEqual(cfg["maps"][0]["winner"], "left")
+            self.assertEqual(cfg["current_map"], 1)
 
 
 if __name__ == "__main__":
