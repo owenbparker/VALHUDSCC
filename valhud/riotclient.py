@@ -104,6 +104,8 @@ def select_reading(match, agents, names, attack_first="left"):
         if not side:
             continue
         for p in team.get("Players") or []:
+            if (p.get("PlayerIdentity") or {}).get("IsObserver"):
+                continue   # (an observer listed with a team takes no card)
             slots[side] += 1
             if slots[side] > 5:
                 break
@@ -282,6 +284,22 @@ class RiotClient:
         except Exception:
             pass
 
+    def _keep(self, match_id, kind, match):
+        """The first answer for each match, saved with the reader's problem
+        frames (frames/auto, in the Problem report): what an observer's
+        account really gets in a custom game has never been seen."""
+        kept = self.__dict__.setdefault("_kept", set())
+        if (match_id, kind) in kept:
+            return
+        kept.add((match_id, kind))
+        try:
+            folder = os.path.join(self.cache_dir, "frames", "auto")
+            os.makedirs(folder, exist_ok=True)
+            with open(os.path.join(folder, time.strftime(f"%Y%m%d-%H%M%S-riot-{kind}.json")), "w", encoding="utf-8") as f:
+                json.dump(match, f, indent=1)
+        except (OSError, TypeError, ValueError):
+            pass
+
     # --- the loop -------------------------------------------------------------------
 
     def _match_id(self, kind):
@@ -307,6 +325,7 @@ class RiotClient:
             subjects = [p.get("Subject") for t in (match.get("Teams") or [match.get("AllyTeam") or {}])
                         for p in (t.get("Players") or [])]
             self._name_all(subjects)
+            self._keep(pre, "pregame", match)
             self.send({"source": "riot", "agent_select": select_reading(match, self._agents, self._names, attack_first)})
             if self._was != "pregame":
                 self.log("Riot Client: agent select")
@@ -322,6 +341,7 @@ class RiotClient:
             self._was = ""
             return "Not in a match"
         match = self._glz(f"/core-game/v1/matches/{core}")
+        self._keep(core, "core-game", match)
         self._name_all([p.get("Subject") for p in match.get("Players") or []])
         update = {"source": "riot", "riot_roster": roster(match, self._agents, self._names, attack_first),
                   "attack_first": attack_first}   # (an observer PC's own setting: the GFX PC turns it round to its own)

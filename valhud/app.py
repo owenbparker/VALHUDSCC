@@ -603,8 +603,17 @@ class HudApp:
             with self._lock:
                 state = json.loads(json.dumps(self.state, default=str))
             from .version import VERSION
-            z.writestr("state-now.json", json.dumps({"version": VERSION, "mode": self.mode, "state": state,
-                                                     "agent_select": self.agent_select.view([])}, indent=1))
+            cfg = self.config.get()
+            z.writestr("state-now.json", json.dumps({
+                "version": VERSION, "mode": self.mode, "role": self.role, "state": state,
+                "agent_select": self.agent_select.view([]), "agent_select_source": self.agent_select.source,
+                # (what decides which team is which, and what the Riot Client gave)
+                "attack_first": cfg.get("attack_first"), "team_size": cfg.get("team_size"),
+                "current_map": cfg.get("current_map"), "maps": cfg.get("maps"),
+                "teams": {side: (cfg.get(side) or {}).get("name") for side in ("left", "right")},
+                "riot": self.riot.info(), "riot_roster": self.riot_roster, "riot_sides": sorted(self._riot_sides),
+                "names_seen": {k: sorted(v) for k, v in self.rosters.names.items()},
+                "reader": self.reader.info(), "feed": self.feed.info()}, indent=1, default=str))
             z.writestr("log-recent.txt", "\n".join(f"[{e['time']}] {e['level'].upper():5} {e['message']}" for e in since(0)))
         log(f"Problem report saved: {os.path.basename(path)}")
         return path
