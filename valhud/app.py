@@ -421,6 +421,15 @@ class HudApp:
             if team:
                 changes[side] = team
                 done.append(f"{side}: {team.get('name') or team.get('tricode') or 'logo'}")
+        # The series length: Global's is the one shown (the HUD's series
+        # pips and map list follow it).
+        try:
+            bo = int(g.get("best_of") or 0)
+        except (TypeError, ValueError):
+            bo = 0
+        if bo in (1, 3, 5, 7) and bo != int(self.config.get().get("best_of") or 3):
+            changes["best_of"] = bo
+            done.append(f"best of {bo}")
         # Its sponsors, in the HUD's sponsor rotation.
         sponsors, secs = save_sponsors(g, fetch, SPONSOR_DIR, "sponsors/", log)
         if sponsors:

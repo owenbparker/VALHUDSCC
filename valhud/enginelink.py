@@ -534,10 +534,12 @@ def _scores_only(series):
 
 def _global_key(g):
     """What of the engine's Global configuration a HUD takes in: each team's
-    (name, short, logo, colour, series score), the tournament logo and the sponsors."""
+    (name, short, logo, colour, series score), the tournament logo, the
+    sponsors and the series length."""
     team = lambda s: tuple(str((g.get(s) or {}).get(k) or "") for k in _TEAM_KEYS)
     return (team("left"), team("right"), str(g.get("tournament_logo") or ""),
-            json.dumps([[sp.get("logo"), sp.get("secs")] for sp in g.get("sponsors") or [] if isinstance(sp, dict)]))
+            json.dumps([[sp.get("logo"), sp.get("secs")] for sp in g.get("sponsors") or [] if isinstance(sp, dict)]),
+            str(g.get("best_of") or ""))
 
 
 def _swapped(old, new):

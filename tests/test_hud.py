@@ -394,7 +394,7 @@ class EngineLinkTests(unittest.TestCase):
                     base = f"http://127.0.0.1:{engine_port}"
                     return self._json({"global": {
                         "left": {"name": "Sentinels", "short": "SEN", "logo_url": base + "/logo.png"},
-                        "right": {"name": "Fnatic", "short": "FNC", "logo_url": base + "/logo.png"}}})
+                        "right": {"name": "Fnatic", "short": "FNC", "logo_url": base + "/logo.png"}, "best_of": 5}})
                 if self.path == "/logo.png":
                     self.send_response(200)
                     self.send_header("Content-Length", str(len(logo)))
@@ -434,7 +434,7 @@ class EngineLinkTests(unittest.TestCase):
                 self.assertEqual(body["source"], "VALORANT HUD")
                 self.assertEqual(body["game"], "valorant")
                 self.assertEqual(body["series"]["left"], {"score": 0})   # (never its teams: Global has those)
-                self.assertEqual(body["series"]["best_of"], 3)
+                self.assertIn(body["series"]["best_of"], (3, 5))   # (5 once it's followed Global)
                 self.assertIn("TEAM LEFT", body["fields"])
                 self.assertIn("LEFT P1 AGENT", body["fields"])
                 state = json.loads(urllib.request.urlopen(f"http://127.0.0.1:{hud_port}/api/engine", timeout=5).read())
@@ -445,6 +445,7 @@ class EngineLinkTests(unittest.TestCase):
                 c = cfg.get()
                 self.assertEqual((c["left"]["name"], c["left"]["tricode"]), ("Sentinels", "SEN"))
                 self.assertEqual((c["right"]["name"], c["right"]["tricode"]), ("Fnatic", "FNC"))
+                self.assertEqual(c["best_of"], 5)   # (Global's series length too)
                 self.assertEqual(c["left"]["logo"], "assets/logos/engine-SEN.png")
                 with open(os.path.join(tmp, "logos", "engine-FNC.png"), "rb") as f:
                     self.assertEqual(f.read(), logo)
