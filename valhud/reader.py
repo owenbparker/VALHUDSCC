@@ -264,21 +264,52 @@ def top_portrait(frame, side, slot):
 
 # --- the scoreboard ---------------------------------------------------------
 
+def _tint(frame, x0, y0, x1, y1):
+    """(teal, red) fractions of a box's pixels."""
+    data = _pixels(frame.crop(x0, y0, x1, y1))
+    teal = sum(1 for p in data if p[1] > p[0] + 30 and p[2] > p[0] + 15)
+    red = sum(1 for p in data if p[0] > p[1] + 40 and p[0] > p[2] + 30)
+    return teal / max(1, len(data)), red / max(1, len(data))
+
+
+def select_header(frame):
+    """Is agent select's header across the top? (teal DEFENDERS half on the
+    left, red ATTACKERS half on the right, from the very top of the screen to
+    below where the match's top bar would be.) Its colours are where the
+    top bar's are, so without this agent select reads as the match."""
+    return (_tint(frame, 330, 5, 560, 25)[0] > 0.6 and _tint(frame, 330, 95, 560, 130)[0] > 0.6
+            and _tint(frame, 1360, 5, 1590, 25)[1] > 0.5 and _tint(frame, 1360, 95, 1590, 130)[1] > 0.5)
+
+
 def attacking_side(frame):
     """Which team attacks, from the top bar: defenders' half is teal,
-    attackers' red. None if it can't be told (top bar not on screen)."""
+    attackers' red. None if it can't be told (top bar not on screen, or
+    agent select's header there instead)."""
     def tint(x0, x1):
-        data = _pixels(frame.crop(x0, 34, x1, 66))
-        teal = sum(1 for p in data if p[1] > p[0] + 30 and p[2] > p[0] + 15)
-        red = sum(1 for p in data if p[0] > p[1] + 40 and p[0] > p[2] + 30)
-        return teal / max(1, len(data)), red / max(1, len(data))
+        return _tint(frame, x0, 34, x1, 66)
     lt, lr = tint(TOP_X["left"][0] - 40, TOP_X["left"][-1] + 30)
     rt, rr = tint(TOP_X["right"][0] - 30, TOP_X["right"][-1] + 40)
+    if select_header(frame):
+        return None
     if lr > 0.15 and rt > 0.15 and lr > lt and rt > rr:
         return "left"
     if lt > 0.15 and rr > 0.15 and lt > lr and rr > rt:
         return "right"
     return None
+
+
+def in_match(frame, bars=None):
+    """Is the match's top bar on screen? Its colours tell the attacking side;
+    a 2v2's (two players a side) may be too short for that, so a lit health
+    bar counts too, unless it's agent select. Loading screens, menus and the
+    end-of-match screen are none of these, and nothing is read off them."""
+    if attacking_side(frame):
+        return True
+    if select_header(frame):
+        return False
+    bars = bars if bars is not None else [health_bar(frame, side, slot)[0] for side in ("left", "right")
+                                          for slot in range(1, 6)]
+    return any(bars)
 
 
 # Round history on the Tab scoreboard: a row for the defending team and one
@@ -1354,13 +1385,16 @@ class ScreenReader:
         while not self._stop.is_set():
             try:
                 image, reason = capture_valorant(top=self.ALIVE_TOP)
-                if image is not None:
-                    frame = Frame(image)
-                    players = []
-                    for side in ("left", "right"):
-                        for slot in range(1, 6):
-                            alive, health = health_bar(frame, side, slot)
-                            players.append({"team": side, "slot": slot, "alive": alive, "health": health})
+                frame = Frame(image) if image is not None else None
+                players = []
+                for side in ("left", "right") if frame else ():
+                    for slot in range(1, 6):
+                        alive, health = health_bar(frame, side, slot)
+                        players.append({"team": side, "slot": slot, "alive": alive, "health": health})
+                # Only off the match's top bar: on agent select, a loading
+                # screen or a menu every bar reads as gone (everyone dead,
+                # and a death counted for each).
+                if frame and in_match(frame, [p["alive"] for p in players]):
                     update = {"source": "screen", "players": players}
                     if attacking_side(frame):   # the top bar's on screen: the phase can be told
                         update["match"] = {"phase": self.banner.seen(buy_phase(frame))}
@@ -1473,6 +1507,10 @@ class ScreenReader:
                     if self.kda.base:   # a new game: last game's K/D/A is done with
                         from .killfeed import LiveKda
                         self.kda = LiveKda()
+                    # ...and the agents learned for each seat (kept, they'd
+                    # put last map's agents on this map's seats until
+                    # learned again)
+                    self.agents, self._agent_votes = {}, {}
                     if self.select.empty_for() > 20:
                         self._keep_frame(image, "agent-select-unread")
                     elif self.select.unread_for() > 8:
@@ -1483,8 +1521,13 @@ class ScreenReader:
                     self._keep_frame(image, "unknown")
                 if image is None or self.select.active:
                     pass   # (agent select is sent by the tracker: no match to read)
+                elif not in_match(Frame(image)):
+                    pass   # (a loading screen, a menu, the end of the match: nothing to read)
                 else:
                     update = read_frame(image, self.ocr, self.agents)
+                    # (this frame's own top-bar agents: a learned one only
+                    # stands in where the top bar didn't show another)
+                    fresh = {(t, s_): a for t, s_, a in update.get("seen_agents", [])}
                     self._learn_agents(update)
                     self._steady_score(update)
                     board = set()
@@ -1506,8 +1549,9 @@ class ScreenReader:
                             p.pop("alive", None)
                             p.pop("health", None)
                     for p in update["players"]:
-                        if (p["team"], p["slot"]) in self.agents:
-                            p["agent"] = self.agents[(p["team"], p["slot"])]
+                        seat = (p["team"], p["slot"])
+                        if seat in self.agents and fresh.get(seat, self.agents[seat]) == self.agents[seat]:
+                            p["agent"] = self.agents[seat]
                     self.last, self.read_at = update, time.time()
                     self.send(update)
             except Exception as e:
@@ -1526,6 +1570,7 @@ class SelectTracker:
     agent select is over."""
 
     HOLD = 120.0   # longest the loading screen keeps agent select up
+    AWAY = 15.0    # agent select back after this long off screen is a new one
 
     def __init__(self, send):
         self.send = send
@@ -1561,7 +1606,7 @@ class SelectTracker:
                     return False
                 # Agent select stays up through the loading screen, until the
                 # match's top bar shows (or it's been too long).
-                in_game = attacking_side(Frame(image)) is not None
+                in_game = in_match(Frame(image))
                 if in_game or time.time() - self.seen_at > self.HOLD:
                     self.active = False
                     self.empty_since = 0.0
@@ -1571,6 +1616,15 @@ class SelectTracker:
                     return False
                 self.send({"source": "screen", "agent_select": {"active": True}})   # (still up)
                 return True
+            if self.seen_at and time.time() - self.seen_at > self.AWAY:
+                # Gone a while and back (a remake, the next map without the
+                # match seen in between): its cards and names start again,
+                # the seats may hold other players now.
+                self._names, self._steady, self._pending = {}, {}, {}
+                self.empty_since = self.unread_since = 0.0
+                if self.active:
+                    self.send({"source": "screen", "agent_select": {"active": False}})
+                self.active = False
             self.seen_at = time.time()
             if not self.active:
                 log("Agent select on screen" + (f" ({reading['map']})" if reading.get("map") else ""))
@@ -1585,6 +1639,12 @@ class SelectTracker:
                 self.unread_since = time.time()
             for p in reading["players"]:
                 key, value = (p["team"], p["slot"]), (p["agent"], p["locked"])
+                held = self._steady.get(key)
+                if held and held[1] and not (value[1] and value[0]):
+                    # Locked in is final: a card misread for a moment (its
+                    # portrait not matched, the name's colour missed) keeps
+                    # its pick. Only another locked reading replaces it.
+                    value = held
                 if key not in self._steady or self._pending.get(key) == value:
                     self._steady[key] = value
                 self._pending[key] = value

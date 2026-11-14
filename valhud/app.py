@@ -17,6 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, unquote, urlparse
 
 from . import appearance, game, mapbans, outputs, recolor
+from .teamsides import AttackFirst, Rosters, roster_flipped, swap_reading
 from .agentselect import AgentSelect, AgentSelectDemo
 from .cams import CamHub, cam_links
 from .config import DATA_DIR, LOGO_DIR, SPONSOR_DIR, WEB_DIR, web_file
@@ -78,6 +79,9 @@ class HudApp:
         # PC (sent the same way as the screen reader's readings).
         self.riot = RiotClient(self._reader_update, config, DATA_DIR, log)
         self.riot_roster, self.riot_at, self._riot_select_at = None, 0.0, 0.0
+        self._riot_sides = set()     # the teams the Riot Client's agent select has players for
+        self.rosters = Rosters()     # players' names seen on each team (which side is which in agent select)
+        self._attack_first = AttackFirst()
         self.riot.start()
         self.map_art = mapbans.MapArt()
         self.series = Series(config, log)   # maps from Map Bans, won maps, the series score
@@ -89,10 +93,13 @@ class HudApp:
         read off the screen becomes the map being played."""
         was_active = self.agent_select.state["active"]
         new_map = self.agent_select.apply(reading, source)
-        if source != "demo" and reading.get("active") and not was_active:
-            # The next map: it's the current one, and the last one's data goes.
-            if self.series.agent_select_started():
-                self.feed.apply({"source": "agent select", "reset": True})
+        if source not in ("demo", "control panel") and reading.get("active") and not was_active:
+            # The next map: it's the current one, and the last one's data goes
+            # (always: the last map's players left in would lend their names
+            # to this agent select's cards by agent, and their agents and
+            # deaths to the new map's first reads).
+            self.series.agent_select_started()
+            self.feed.apply({"source": "agent select", "reset": True})
         if new_map and source != "demo":
             cfg = self.config.get()
             maps = [dict(m) for m in cfg.get("maps") or []]
@@ -102,6 +109,25 @@ class HudApp:
                 self.config.update({"maps": maps})
                 log(f"Agent select: the map is {new_map} (map {i + 1} of the series)")
             self.feed.apply({"source": source or "agent select", "match": {"map": new_map}})
+
+    def _select_flip(self, reading):
+        """An agent select reading whose names are plainly the other team's
+        players (who attacks first set the wrong way round): turned round,
+        and who attacks first put right for the rest of it."""
+        cfg = self.config.get()
+        if not self.rosters.flipped(reading, cfg):
+            return reading
+        flip = {"left": "right", "right": "left"}
+        now = flip.get(cfg.get("attack_first"), "right")
+        self.config.update({"attack_first": now})
+        self._riot_sides = {flip.get(t, t) for t in self._riot_sides}
+        log(f"Agent select: the names on each side are the other team's players, so "
+            f"{cfg[now]['name'] or now} attacks first (set in Series & maps)", "warn")
+        # (what's been read so far is turned round too)
+        with self.agent_select._lock:
+            ps = self.agent_select.state["players"]
+            ps["left"], ps["right"] = ps["right"], ps["left"]
+        return swap_reading(reading)
 
     def _select_sides(self, reading):
         """The agent select screen shows DEFENDERS left and ATTACKERS right:
@@ -186,18 +212,31 @@ class HudApp:
             update = dict(update)
             source = str(update.get("source") or "screen")
             # Agent select from the Riot Client first, then the screen.
+            reading = self._select_sides(update.pop("agent_select"))
+            used = reading.pop("attack_first", None) if source == "riot" else None
+            if used in ("left", "right") and used != (self.config.get().get("attack_first") or "left"):
+                reading = swap_reading(reading)   # (read before who attacks first changed)
             if source == "riot":
                 self._riot_select_at = time.time()
+                sides = {p.get("team") for p in reading.get("players") or []}
+                if sides or not reading.get("active", True):
+                    self._riot_sides = sides
             # (once the Riot Client's given this agent select, the screen's
             # readings are left out until it ends: two sources' seat orders
-            # mixed would pair names with the wrong agents)
-            if source != "riot" and time.time() - self._riot_select_at < 5 + (120 if self.agent_select.source == "riot"
-                                                                               and self.agent_select.state["active"] else 0):
-                update.pop("agent_select")
-                if not update.get("match") and not update.get("players") and "spectating" not in update:
-                    return {"ok": True}
-            else:
-                self.agent_select_update(self._select_sides(update.pop("agent_select")), "riot" if source == "riot" else "screen")
+            # mixed would pair names with the wrong agents. A team the Riot
+            # Client doesn't have, e.g. its account only sees its own team,
+            # still comes off the screen.)
+            riot_on = time.time() - self._riot_select_at < 5 + (120 if self.agent_select.source == "riot"
+                                                                and self.agent_select.state["active"] else 0)
+            if source != "riot" and riot_on:
+                players = [p for p in reading.get("players") or [] if p.get("team") not in self._riot_sides]
+                reading = {k: v for k, v in reading.items() if k in ("map",) and not self.agent_select.state["map"]}
+                if players:
+                    reading["players"] = players
+                source = "riot"   # (still the Riot Client's agent select, with the screen filling in)
+            if reading:
+                reading = self._select_flip(reading)
+                self.agent_select_update(reading, "riot" if source == "riot" else "screen")
             if not update.get("match") and not update.get("players") and "spectating" not in update:
                 if self.mode == "live":
                     self.refresh()   # (a map read off the screen)
@@ -212,9 +251,24 @@ class HudApp:
         if isinstance(update, dict) and update.get("source") == "screen" and self.config.get().get("team_size") == 2:
             update = game.round_won(self.feed.state, game.two_a_side(update))
         self.feed.apply(update)
+        self._check_attack_first(update)
         if self.mode == "live":
             self.refresh()
         return self.observed_name()
+
+    def _check_attack_first(self, update):
+        """Who attacks first, put right from the top bar (the attacking team
+        in rounds 1-12): agent select's sides, the Riot Client's teams and the
+        demo go by it."""
+        cfg = self.config.get()
+        m = update.get("match") if isinstance(update, dict) and update.get("source") == "screen" else None
+        if not m or not m.get("attackers") or cfg.get("team_size") == 2 or self.mode != "live":
+            return
+        side = self._attack_first.seen(m["attackers"], self.feed.state["match"].get("round"))
+        if side and side != cfg.get("attack_first"):
+            self.config.update({"attack_first": side})
+            log(f"Who attacks first set to {cfg[side]['name'] or side} (the top bar shows them attacking in round "
+                f"{self.feed.state['match'].get('round')})", "warn")
 
     SPECTATING_FOR = 3.0   # seconds a reading counts for (the observer sends one a second at least)
 
@@ -232,6 +286,10 @@ class HudApp:
         # Names not typed or scanned: the ones read in agent select, by agent.
         picks = self.agent_select.view([])["players"]
         roster = self.riot_roster if time.time() - self.riot_at < 30 else None
+        if roster and roster_flipped(roster, state):
+            # (its teams come from who attacks first: the top bar's agents
+            # say they're the other way round)
+            roster = {"left": roster.get("right") or [], "right": roster.get("left") or []}
         for p in state["players"]:
             if not p.get("name") and p.get("agent") and roster:
                 # The Riot Client's roster: the Riot ID of the player on that agent.
@@ -242,6 +300,8 @@ class HudApp:
                 match = [q["name"] for q in picks.get(p["team"], []) if q.get("agent") == p["agent"] and q.get("name")]
                 if len(match) == 1:
                     p["name"] = match[0]
+        if self.mode == "live" and fetch and state["connected"]:
+            self.rosters.learn(state, cfg)
         text, at, agent, side = self.spectating
         if time.time() - at < self.SPECTATING_FOR:
             state["match"]["observed"] = (game.observed_player(state, text)

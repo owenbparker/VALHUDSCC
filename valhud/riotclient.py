@@ -33,7 +33,7 @@ from . import game
 # Internal map names (MapID's last part) -> ours.
 MAP_IDS = {"Infinity": "Abyss", "Triad": "Haven", "Duality": "Bind", "Bonsai": "Split", "Ascent": "Ascent",
            "Port": "Icebox", "Foxtrot": "Breeze", "Canyon": "Fracture", "Pitt": "Pearl", "Jam": "Lotus",
-           "Juliett": "Sunset", "Rook": "Corrode", "Range": "Range", "HURM_Alley": "District",
+           "Juliett": "Sunset", "Rook": "Corrode", "Plummet": "Summit", "Range": "Range", "HURM_Alley": "District",
            "HURM_Yard": "Piazza", "HURM_Bowl": "Kasbah", "HURM_Helix": "Drift", "HURM_HighTide": "Glitch"}
 
 PLATFORM = base64.b64encode(json.dumps({
@@ -55,10 +55,15 @@ def read_lockfile(path=None):
         return None
 
 
+# Maps added to the game after this list: their codes from valorant-api.com
+# (RiotClient._load_maps), by the map's name.
+MORE_MAP_IDS = {}
+
+
 def map_from_id(map_id):
     """"/Game/Maps/Ascent/Ascent" -> "Ascent"; "/Game/Maps/Triad/Triad" -> "Haven"."""
     code = str(map_id or "").rstrip("/").split("/")[-1]
-    return MAP_IDS.get(code, "")
+    return MAP_IDS.get(code) or MORE_MAP_IDS.get(code, "")
 
 
 def region_of(sessions):
@@ -109,7 +114,9 @@ def select_reading(match, agents, names, attack_first="left"):
             if name:
                 q["name"] = name
             players.append(q)
-    reading = {"active": True, "players": players}
+    # (who attacked first when this was read: the app turns the reading round
+    # if that's changed since)
+    reading = {"active": True, "players": players, "attack_first": attack_first}
     m = map_from_id(match.get("MapID"))
     if m:
         reading["map"] = m
@@ -217,6 +224,20 @@ class RiotClient:
             except (OSError, ValueError):
                 return None
 
+    def _load_maps(self):
+        """Map codes the list above doesn't have yet (a map added to the game
+        later), from valorant-api.com: only maps the HUD has art for."""
+        from .mapbans import ALL_MAPS
+        try:
+            data = self._get("https://valorant-api.com/v1/maps", timeout=8)["data"]
+        except Exception:
+            return
+        for m in data or []:
+            code = str(m.get("mapUrl") or "").rstrip("/").split("/")[-1]
+            name = next((n for n in ALL_MAPS if n.lower() == str(m.get("displayName") or "").lower()), None)
+            if code and name and code not in MAP_IDS:
+                MORE_MAP_IDS[code] = name
+
     def _load_version(self):
         try:
             return self._get("https://valorant-api.com/v1/version", timeout=8)["data"]["riotClientVersion"]
@@ -244,6 +265,7 @@ class RiotClient:
                 return "Couldn't get the agent list (valorant-api.com)"
         if not self._version:
             self._version = self._load_version()
+            self._load_maps()
         return None
 
     def _name_all(self, subjects):

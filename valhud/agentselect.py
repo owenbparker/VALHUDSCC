@@ -18,8 +18,9 @@ import time
 
 from .game import AGENTS, SIDES, agent_name
 
-MAPS = ["Abyss", "Ascent", "Bind", "Breeze", "Corrode", "Fracture", "Haven", "Icebox", "Lotus", "Pearl",
-        "Split", "Sunset"]
+# Every map the HUD knows (Map Bans' list: Summit was missing here, so it
+# never became the map being played).
+from .mapbans import ALL_MAPS as MAPS  # noqa: E402
 STALE_AFTER = 10.0   # a screen reading counts for this long (it's sent every second or so)
 
 
@@ -69,11 +70,18 @@ class AgentSelect:
                 if team not in SIDES or not isinstance(slot, int) or not 1 <= slot <= 5:
                     continue
                 target = s["players"][team][slot - 1]
-                if "agent" in p:
-                    a = agent_name(p["agent"]) if p["agent"] else ""
-                    target["agent"] = a if a in AGENTS else ""
-                if "locked" in p:
-                    target["locked"] = bool(p["locked"]) and bool(target["agent"])
+                a = (agent_name(p["agent"]) if p["agent"] else "") if "agent" in p else target["agent"]
+                a = a if a in AGENTS else ""
+                if target["locked"] and target["agent"] and not (p.get("locked") and a) and source != "control panel":
+                    # A locked pick is final: a reading with the card empty or
+                    # unlocked (misread, or an agent the source didn't know)
+                    # doesn't take it away. Another locked agent corrects it.
+                    pass
+                else:
+                    if "agent" in p:
+                        target["agent"] = a
+                    if "locked" in p:
+                        target["locked"] = bool(p["locked"]) and bool(target["agent"])
                 if p.get("name"):
                     target["name"] = str(p["name"])[:32]   # as read off the screen
             self.source = source or self.source
