@@ -242,17 +242,19 @@
         '" style="height:13px;width:auto;margin:0 5px;vertical-align:-2px">' : "";
     };
     var esc = function (t) { return String(t || "").toUpperCase().replace(/[&<>"]/g, function (c) { return "&#" + c.charCodeAt(0) + ";"; }); };
-    [0, 1, 2].forEach(function (i) {
-      var map = i < shown ? (cfg.maps || [])[i] : null, label = "";
+    // (a best of 5 has more maps than room: the three around the current one)
+    var all = (cfg.maps || []).slice(0, Math.max(1, cfg.best_of || 3)), first = shown === 3 ? Math.max(0, Math.min((cfg.current_map || 0) - 1, all.length - 3)) : 0;
+    [0, 1, 2].forEach(function (slot) {
+      var i = first + slot, map = slot < shown ? all[i] : null, label = "";
       if (map && map.name) {
         var name = esc(map.name);
         if (map.winner && map.score) label = name + logo("left") + map.score.left + " - " + map.score.right + logo("right");
         else if (map.winner) label = name + " <span>" + esc(cfg[map.winner].tricode) + "</span>";
         else if (i === (cfg.current_map || 0)) label = "CURRENT: " + name + logo(map.picked_by);
-        else if (shown === 3 && i === 2) label = "DECIDER: " + name;
+        else if (shown === 3 && i === all.length - 1 && all.length === Number(cfg.best_of || 3)) label = "DECIDER: " + name;
         else label = "NEXT: " + name + logo(map.picked_by);
       }
-      call("map" + i, SetMapResult, [i, label]);
+      call("map" + slot, SetMapResult, [slot, label]);
     });
 
     // Players: team 0 is the left panel, team 1 the right; slots 1-5.
