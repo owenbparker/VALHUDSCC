@@ -79,6 +79,7 @@ WIDE, WIDE_K = 96, 4      # the search for the layout: this far round a card, at
 WIDE_SCALES = (0.84, 0.88, 0.92, 0.96, 1.0, 1.04, 1.08, 1.12, 1.16, 1.2)
 WIDE_MIN = 0.5            # a 1/4-scale match good enough to look at closely
 CALIBRATE_EVERY = 5.0     # seconds between searches while cards stay unread
+RECHECK = 2.0             # seconds between second looks at a name already read
 
 
 class Layout:
@@ -431,6 +432,21 @@ def read(image, ocr=None, names=None, layout=None):
             agent = cards[(side, row)]
             p = {"team": side, "slot": row + 1, "agent": agent,
                  "locked": bool(agent) and card_locked(frame, side, row, layout)}
+            have = names.get((side, row))
+            if ocr and have and time.time() - names.get(("checked", side, row), 0) >= RECHECK:
+                # A name confirmed mid-animation can be the start of the real
+                # one ("Juw" for "Juwan"): looked at again now and then, and
+                # a longer reading that starts the same, read twice, takes over.
+                names[("checked", side, row)] = time.time()
+                try:
+                    text = read_name(frame, side, row, ocr, layout)
+                    longer = names.setdefault(("longer", side, row), [])
+                    if text and len(text) > len(have) and text.lower().startswith(have.lower()[:max(2, len(have) - 1)]):
+                        longer.append(text)
+                        if longer.count(text) >= 2:
+                            names[(side, row)] = text
+                except Exception:
+                    pass
             if ocr and not names.get((side, row)):
                 # A name counts once it's been read the same twice (a first
                 # read mid-animation, or of a locked card's coloured text,

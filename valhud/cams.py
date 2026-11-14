@@ -59,14 +59,21 @@ def name_matches(riot_name, player_name):
 def match_players(riot_ids, players):
     """{riot id: {"team", "slot", "name"}} for the ids that are in the match."""
     out, taken = {}, set()
-    for rid in riot_ids:
-        name = rid.split("#")[0]
-        for p in players:
-            key = (p.get("team"), p.get("slot"))
-            if key not in taken and name_matches(name, p.get("name") or ""):
-                out[rid] = {"team": key[0], "slot": key[1], "name": p.get("name")}
-                taken.add(key)
-                break
+    # Exact names first, then close ones: a close match taken first could
+    # take another Riot ID's exact player ("Leaf" vs "Leafy").
+    for exact in (True, False):
+        for rid in riot_ids:
+            if rid in out:
+                continue
+            name = rid.split("#")[0]
+            for p in players:
+                key = (p.get("team"), p.get("slot"))
+                same = normalise(name) == normalise(p.get("name") or "") if exact else \
+                    name_matches(name, p.get("name") or "")
+                if key not in taken and same and normalise(name):
+                    out[rid] = {"team": key[0], "slot": key[1], "name": p.get("name")}
+                    taken.add(key)
+                    break
     return out
 
 

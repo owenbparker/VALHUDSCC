@@ -323,7 +323,8 @@ class RiotClient:
             return "Not in a match"
         match = self._glz(f"/core-game/v1/matches/{core}")
         self._name_all([p.get("Subject") for p in match.get("Players") or []])
-        update = {"source": "riot", "riot_roster": roster(match, self._agents, self._names, attack_first)}
+        update = {"source": "riot", "riot_roster": roster(match, self._agents, self._names, attack_first),
+                  "attack_first": attack_first}   # (an observer PC's own setting: the GFX PC turns it round to its own)
         m = map_from_id(match.get("MapID"))
         if m and m != "Range":
             update["match"] = {"map": m}

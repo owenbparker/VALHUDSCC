@@ -203,7 +203,12 @@ class HudApp:
         """Live data from a feed (screen reader, Riot Client, another tool)."""
         if isinstance(update, dict) and isinstance(update.get("riot_roster"), dict):
             update = dict(update)
-            self.riot_roster, self.riot_at = update.pop("riot_roster"), time.time()
+            roster, used = update.pop("riot_roster"), update.pop("attack_first", None)
+            if used in ("left", "right") and used != (self.config.get().get("attack_first") or "left"):
+                # (sides from another PC's "who attacks first", e.g. the
+                # observer PC's, which is never set: turned round to this one's)
+                roster = {"left": roster.get("right") or [], "right": roster.get("left") or []}
+            self.riot_roster, self.riot_at = roster, time.time()
             if not update.get("match") and not update.get("players"):
                 if self.mode == "live":
                     self.refresh()
