@@ -287,14 +287,20 @@ def attacking_side(frame):
     agent select's header there instead)."""
     def tint(x0, x1):
         return _tint(frame, x0, 34, x1, 66)
-    lt, lr = tint(TOP_X["left"][0] - 40, TOP_X["left"][-1] + 30)
-    rt, rr = tint(TOP_X["right"][0] - 30, TOP_X["right"][-1] + 40)
     if select_header(frame):
         return None
-    if lr > 0.15 and rt > 0.15 and lr > lt and rt > rr:
-        return "left"
-    if lt > 0.15 and rr > 0.15 and lt > lr and rr > rt:
-        return "right"
+    # The whole bar, then only the two seats each side of the score (a 2v2's
+    # bar is just those: across all five seats it's mostly the map behind).
+    for (l0, l1, r0, r1), need in (((TOP_X["left"][0] - 40, TOP_X["left"][-1] + 30,
+                                     TOP_X["right"][0] - 30, TOP_X["right"][-1] + 40), 0.15),
+                                   ((TOP_X["left"][3] - 30, TOP_X["left"][-1] + 30,
+                                     TOP_X["right"][0] - 30, TOP_X["right"][1] + 30), 0.3)):
+        lt, lr = tint(l0, l1)
+        rt, rr = tint(r0, r1)
+        if lr > need and rt > need and lr > lt and rt > rr:
+            return "left"
+        if lt > need and rr > need and lt > lr and rr > rt:
+            return "right"
     return None
 
 

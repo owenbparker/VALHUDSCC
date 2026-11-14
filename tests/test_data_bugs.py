@@ -387,5 +387,37 @@ class LastRoundMissedTests(unittest.TestCase):
             self.assertEqual(cfg["current_map"], 1)
 
 
+class TwoATopBarTests(unittest.TestCase):
+    def test_2v2_bar_tells_the_attackers(self):
+        try:
+            import numpy  # noqa: F401
+        except ImportError:
+            self.skipTest("numpy not installed")
+        from PIL import ImageDraw
+        from valhud.reader import Frame, attacking_side
+        img = frame("spectate", "card_gora46_cypher.webp").convert("RGB")
+        d = ImageDraw.Draw(img)   # only the two seats each side of the score left, the map dark behind
+        d.rectangle((380, 20, 640, 90), fill=(20, 60, 50))
+        d.rectangle((1290, 20, 1540, 90), fill=(20, 60, 50))
+        self.assertEqual(attacking_side(Frame(img)), "right")
+
+
+class KdaDoubleCountTests(unittest.TestCase):
+    def test_kill_bar_read_after_the_scoreboard_isnt_counted_twice(self):
+        from valhud.killfeed import LiveKda
+        k = LiveKda()
+        a, v = ("left", 1), ("right", 2)
+        k.board(a, 0, 0, 0)
+        k.board(v, 0, 0, 0)
+        k.alive(v, True)
+        k.alive(v, False)                 # dies: counted
+        self.assertEqual(k.values(v), (0, 1, 0))
+        k.board(a, 1, 0, 0)               # Tab opened: the board has the kill and the death
+        k.board(v, 0, 1, 0)
+        self.assertFalse(k.kill(a, v))    # the kill bar, read only now
+        self.assertEqual(k.values(a), (1, 0, 0))
+        self.assertEqual(k.values(v), (0, 1, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

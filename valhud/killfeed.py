@@ -191,6 +191,11 @@ class LiveKda:
         with self._lock:
             self.base[seat] = [kills, deaths, assists]
             self.extra[seat] = [0, 0, 0]
+            if self.dead.get(seat):
+                # (the board already has this death, and the kill for it: a
+                # kill bar still up, read after this, mustn't add them again)
+                life = self.life.get(seat, 0)
+                self.died[seat] = self.killed[seat] = life
 
     def _add(self, seat, i):
         self.extra.setdefault(seat, [0, 0, 0])[i] += 1
