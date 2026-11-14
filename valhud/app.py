@@ -523,6 +523,10 @@ class HudApp:
         snap["agent_select"]["demo"] = bool(self._select_demo and self._select_demo.running())
         snap["agent_select"]["agents"] = game.AGENTS
         cfg = snap["config"]
+        if not snap["agent_select"].get("map"):
+            # (not read yet: the series' current map)
+            maps, i = cfg.get("maps") or [], int(cfg.get("current_map") or 0)
+            snap["agent_select"]["map"] = (maps[i].get("name") or "") if 0 <= i < len(maps) else ""
         pool, team_a = mapbans.settings(cfg)
         snap["map_bans"] = {"maps": mapbans.ALL_MAPS, "vct_pool": mapbans.VCT_POOL, "pool": pool, "team_a": team_a,
                             "bo1": mapbans.steps(cfg, "bo1"), "bo3": mapbans.steps(cfg, "bo3")}

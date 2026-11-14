@@ -55,7 +55,10 @@ class AgentSelect:
             if "active" in reading:
                 if reading["active"] and not s["active"]:
                     # A new agent select: start from empty slots.
+                    # (and no map until it's read: the last one's art
+                    # stayed up; the overlay shows the series' current map)
                     s["players"] = empty()["players"]
+                    s["map"], s["timer"], s["timer_at"] = "", 0, 0
                 s["active"] = bool(reading["active"])
             if reading.get("map") is not None:
                 m = map_name(reading["map"])
