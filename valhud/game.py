@@ -80,9 +80,10 @@ def two_a_side(update):
 
 
 def round_won(state, update):
-    """The update with this round added to the round history when its score
-    is one round on from the state's (for screens whose history isn't read,
-    e.g. a 2v2's Tab scoreboard). How it was won is told from the spike."""
+    """The update with this round added to the round history (and as the
+    round's winner) when its score is one round on from the state's: the
+    history between Tab scoreboard reads, and a 2v2's, whose Tab history
+    isn't read. How it was won is told from the spike and who's left."""
     m, new = state.get("match") or {}, (update.get("match") or {}).get("score")
     if not isinstance(new, dict) or "rounds" in update["match"]:
         return update
@@ -92,6 +93,9 @@ def round_won(state, update):
     if len(up) != 1 or len(others) != 1 or len(rounds) != sum(old.get(side) or 0 for side in SIDES):
         return update
     winner, spike = up[0], (m.get("spike") or {}).get("state")
+    if spike not in ("planted", "defused", "detonated") and \
+            m.get("planted_round") == sum(int(old.get(side) or 0) for side in SIDES) + 1:
+        spike = "planted"   # (this round's plant: the icon's gone now)
     attackers = m.get("attackers") or "left"
     players = state.get("players") or []
     seated = [p for p in players if p.get("agent") or p.get("name")]
@@ -109,7 +113,8 @@ def round_won(state, update):
     else:
         # The defenders running the clock down with attackers still alive.
         how = "Time" if winner != attackers and known and alive[loser] else "Elimination"
-    return dict(update, match=dict(update["match"], rounds=rounds + [{"winner": winner, "win_type": how}]))
+    return dict(update, match=dict(update["match"], rounds=rounds + [{"winner": winner, "win_type": how}],
+                                   round_winner=winner, win_type=how))
 
 
 def empty_player(team, slot):
@@ -143,12 +148,22 @@ def merge(state, update):
     o = m.get("observed", False)
     if o is None or (isinstance(o, dict) and o.get("team") in SIDES and o.get("slot") in range(1, 6)):
         out["match"]["observed"] = {"team": o["team"], "slot": o["slot"]} if o else None
+    was = out["match"].get("phase")
     for key in ("map", "round", "phase", "timer", "attackers", "round_winner", "win_type", "rounds"):
         if key in m:
             out["match"][key] = m[key]
+    # The last round's winner stays up through the buy phase, and goes when
+    # the next round's under way.
+    if m.get("phase") == "combat" and was == "buy" and "round_winner" not in m:
+        out["match"]["round_winner"], out["match"]["win_type"] = "", ""
     for key in ("score", "spike"):
         if isinstance(m.get(key), dict):
             out["match"][key].update(m[key])
+    # The round the spike was last seen planted in: the planted icon is gone
+    # by the time the round's score is read (defused or gone off), and how
+    # the round was won goes by it (see round_won).
+    if isinstance(m.get("spike"), dict) and m["spike"].get("state") in ("planted", "defused", "detonated"):
+        out["match"]["planted_round"] = sum(int(v or 0) for v in out["match"]["score"].values()) + 1
     # Never more rounds of history than have been played (a new game starts
     # at 0-0; history read before it is dropped).
     played = sum(int(v or 0) for v in out["match"]["score"].values())

@@ -272,6 +272,20 @@ class ReaderTests(unittest.TestCase):
         s["match"]["spike"]["state"] = "detonated"
         up = game.round_won(s, {"match": {"score": {"left": 3, "right": 2}}})
         self.assertEqual(up["match"]["rounds"][-1], {"winner": "left", "win_type": "Detonation"})
+        # The planted icon's gone by the time the score's read (defused):
+        # the round's plant still counts.
+        s = game.merge(s, up)
+        for p in s["players"]:
+            p["alive"] = True
+        s = game.merge(s, {"match": {"spike": {"state": "planted"}}})
+        s = game.merge(s, {"match": {"spike": {"state": "", "carrier": None}}})
+        up = game.round_won(s, {"match": {"score": {"left": 3, "right": 3}}})
+        self.assertEqual(up["match"]["rounds"][-1], {"winner": "right", "win_type": "Deactivation"})
+        # Next round, no plant: defenders running the clock down.
+        s = game.merge(s, up)
+        s["players"][0]["alive"] = False
+        up = game.round_won(s, {"match": {"score": {"left": 3, "right": 4}}})
+        self.assertEqual(up["match"]["rounds"][-1], {"winner": "right", "win_type": "Time"})
         # Joined mid-match (no history to add to): left alone.
         s["match"]["score"] = {"left": 7, "right": 4}
         self.assertNotIn("rounds", game.round_won(s, {"match": {"score": {"left": 8, "right": 4}}})["match"])

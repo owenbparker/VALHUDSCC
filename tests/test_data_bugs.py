@@ -587,3 +587,23 @@ class TypedNamesOnOtherSeatsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RoundHistoryBetweenTabReadsTests(unittest.TestCase):
+    def test_rounds_added_as_the_score_goes_up(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp, attack_first="left")
+            app.ingest({"source": "screen", "match": {"attackers": "left", "phase": "combat", "score": {"left": 1, "right": 1},
+                                                      "rounds": [{"winner": "left", "win_type": "Elimination"},
+                                                                 {"winner": "right", "win_type": "Time"}]}})
+            app.ingest({"source": "screen", "match": {"spike": {"state": "planted"}}})
+            app.ingest({"source": "screen", "match": {"spike": {"state": "", "carrier": None}, "score": {"left": 2, "right": 1}}})
+            m = app.feed.state["match"]
+            self.assertEqual(len(m["rounds"]), 3)
+            self.assertEqual((m["round_winner"], m["win_type"]), ("left", "Detonation"))
+            self.assertEqual(game.fields(app.feed.fetch(), app.config.get())["ROUND WINNER"], "LEFT")
+            # Through the buy phase, gone once the round's under way.
+            app.ingest({"source": "screen", "match": {"phase": "buy"}})
+            self.assertEqual(app.feed.state["match"]["round_winner"], "left")
+            app.ingest({"source": "screen", "match": {"phase": "combat"}})
+            self.assertEqual(app.feed.state["match"]["round_winner"], "")
