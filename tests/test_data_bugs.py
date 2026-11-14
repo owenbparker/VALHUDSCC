@@ -497,5 +497,14 @@ class TwoATeamFieldsTests(unittest.TestCase):
         self.assertEqual(f["CREDITS LEFT"], 3000)
 
 
+class RiotDoesntMakeItLiveTests(unittest.TestCase):
+    def test_riot_map_only_doesnt_keep_the_hud_live(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app = make_app(tmp)
+            app.ingest({"source": "riot", "riot_roster": {"left": [], "right": []}, "match": {"map": "Bind"}})
+            self.assertFalse(app.state["connected"])
+            self.assertEqual(app.state["match"]["map"], "Bind")
+
+
 if __name__ == "__main__":
     unittest.main()

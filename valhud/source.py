@@ -26,7 +26,11 @@ class LiveFeed:
                 self.state = game.empty_state()
             self.state = game.merge(self.state, update)
             now = time.time()
-            self.received_at = now
+            if update.get("source") != "riot":
+                # (the Riot Client only sends the map, every few seconds,
+                # whether the match is being read or not: it doesn't make
+                # the HUD's data live)
+                self.received_at = now
             self.count += 1
             self.sources[str(update.get("source") or "unnamed")] = now
 
