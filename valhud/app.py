@@ -56,6 +56,9 @@ class HudApp:
         self.builder = None         # Custom design: HUD Builder, built in (hudbuilder/embed.py)
         self.updater = Updater()
         self.reader = ScreenReader(self._reader_update)
+        # No updating or going back while a match is being read (it restarts the app).
+        self.updater.busy = lambda: ("A match is being read off the screen"
+                                     if self.reader.enabled and time.time() - self.reader.read_at < 20 else None)
         self.overlay_window = None  # the desktop app's HUD-over-the-game window
         # "gfx" runs the HUD; "observer" only shows another PC's HUD over the
         # game here. None until one is picked.
@@ -962,6 +965,8 @@ def make_handler(app):
                     app.updater.check()
                 elif path == "/api/update/install":
                     app.updater.install_in_background()
+                elif path == "/api/update/rollback":
+                    app.updater.rollback_in_background()
                 elif path == "/api/overlay-window":
                     if not app.overlay_window:
                         raise ValueError("The HUD window is only available in the desktop app")
