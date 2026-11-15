@@ -161,6 +161,9 @@ class RiotClient:
         self._names = {}
         self._was = ""           # "pregame" / "ingame" / ""
         self._ingame_at = 0.0
+        self.on_json = None      # (kind, match id, data): pregame / core-game / match-details, for the recorder
+        self._core_id = None     # the match being played, while it's on
+        self._details_due = {}   # finished match id -> times to ask for its details
         self._ctx = ssl.create_default_context()
         self._local_ctx = ssl._create_unverified_context()   # (the Riot Client's own certificate, on 127.0.0.1)
 
@@ -292,6 +295,11 @@ class RiotClient:
         if (match_id, kind) in kept:
             return
         kept.add((match_id, kind))
+        if self.on_json:
+            try:
+                self.on_json(kind, match_id, match)
+            except Exception as e:
+                self.log(f"Couldn't keep the Riot Client's {kind} with the recording: {e!r}", "warn")
         try:
             folder = os.path.join(self.cache_dir, "frames", "auto")
             os.makedirs(folder, exist_ok=True)
@@ -338,8 +346,16 @@ class RiotClient:
         self._ingame_at = time.time()
         core = self._match_id("core-game")
         if not core:
+            if self._core_id:
+                # The match just ended: its details (every kill and round, from
+                # Riot's servers) come a little later. They're the answer key
+                # the replay checks the reader against.
+                now = time.time()
+                self._details_due[self._core_id] = [now + d for d in self.DETAILS_AFTER]
+                self._core_id = None
             self._was = ""
             return "Not in a match"
+        self._core_id = core
         match = self._glz(f"/core-game/v1/matches/{core}")
         self._keep(core, "core-game", match)
         self._name_all([p.get("Subject") for p in match.get("Players") or []])
@@ -354,9 +370,48 @@ class RiotClient:
         self._was, self.sent_at = "ingame", time.time()
         return "In a match"
 
+    DETAILS_AFTER = (20, 60, 180, 420, 900)   # seconds after a match ends to ask for its details
+
+    def match_details(self, match_id):
+        """The finished match from Riot's servers (unofficial, like the rest):
+        rounds, kills with killer / victim / time, every player's stats."""
+        _, shard = self._region
+        return self._get(f"https://pd.{shard}.a.pvp.net/match-details/v1/matches/{match_id}", self._headers(), timeout=10)
+
+    def _fetch_due_details(self):
+        now = time.time()
+        for match_id, times in list(self._details_due.items()):
+            if not times:
+                self._details_due.pop(match_id, None)
+                continue
+            if now < times[0]:
+                continue
+            times.pop(0)
+            try:
+                if self._ready():
+                    continue
+                details = self.match_details(match_id)
+            except urllib.error.HTTPError as e:
+                if not times:
+                    self.log(f"Riot servers wouldn't give the finished match's details ({e.code}): "
+                             "the replay can't check this match automatically", "warn")
+                continue
+            except Exception as e:
+                if not times:
+                    self.log(f"Couldn't get the finished match's details: {e!r}", "warn")
+                continue
+            if isinstance(details, dict) and details.get("roundResults") is not None:
+                times.clear()
+                self.log(f"Got the finished match's details ({len(details.get('roundResults') or [])} rounds)")
+                self._keep(match_id, "match-details", details)
+
     def _run(self):
         last = None
         while not self._stop.is_set():
+            try:
+                self._fetch_due_details()
+            except Exception as e:
+                self.log(f"Match details check failed: {e!r}", "warn")
             try:
                 self.status = self._step()
             except urllib.error.HTTPError as e:

@@ -27,7 +27,7 @@ from .enginelink import EngineLink, save_logo_bytes, save_sponsors
 from .log import log, since
 from .reader import ScreenReader
 from .series import Series
-from .riotclient import RiotClient
+from .riotclient import RiotClient, map_from_id as riot_map_name
 from .source import LiveFeed
 from .updater import Updater, clean_up_old_update
 
@@ -56,6 +56,13 @@ class HudApp:
         self.builder = None         # Custom design: HUD Builder, built in (hudbuilder/embed.py)
         self.updater = Updater()
         self.reader = ScreenReader(self._reader_update)
+        # Keeps what the reader sees (about a frame a second, and every reading)
+        # so a match can be replayed later: recordings/ next to the app.
+        from .recorder import MatchRecorder
+        from .version import VERSION
+        self.recorder = MatchRecorder(os.path.join(DATA_DIR, "recordings"), version=VERSION,
+                                      enabled=lambda: self.reader.enabled and self.config.get().get("record_matches", True))
+        self.reader.recorder = self.recorder
         # No updating or going back while a match is being read (it restarts the app).
         self.updater.busy = lambda: ("A match is being read off the screen"
                                      if self.reader.enabled and time.time() - self.reader.read_at < 20 else None)
@@ -81,6 +88,7 @@ class HudApp:
         # Agent select and the roster's Riot IDs from the Riot Client on this
         # PC (sent the same way as the screen reader's readings).
         self.riot = RiotClient(self._reader_update, config, DATA_DIR, log)
+        self.riot.on_json = self._riot_json
         self.riot_roster, self.riot_at, self._riot_select_at = None, 0.0, 0.0
         self._riot_sides = set()     # the teams the Riot Client's agent select has players for
         self.rosters = Rosters()     # players' names seen on each team (which side is which in agent select)
@@ -88,6 +96,18 @@ class HudApp:
         self.riot.start()
         self.map_art = mapbans.MapArt()
         self.series = Series(config, log)   # maps from Map Bans, won maps, the series score
+
+    def _riot_json(self, kind, match_id, data):
+        """What the Riot Client gave for a match (pregame, core-game, and the
+        finished match's details): kept with the match recording."""
+        if kind == "match-details":
+            self.recorder.attach("match-details.json", data, match_id=match_id)
+        else:
+            if isinstance(data, dict) and kind == "core-game":
+                m = riot_map_name(data.get("MapID"))
+                if m:
+                    self.recorder.seen("match", m)
+            self.recorder.attach(f"riot-{kind}.json", data)
 
     # --- agent select -------------------------------------------------------
 
@@ -190,6 +210,7 @@ class HudApp:
     def _reader_update(self, update):
         """The screen reader's reading: used here, or sent to the GFX PC when
         this is an observer client."""
+        self.recorder.event("reading", update)
         cfg = self.config.get()
         if self.role == "observer":
             if not cfg.get("observer_url"):
@@ -503,7 +524,7 @@ class HudApp:
         network = bool(cfg.get("allow_network"))
         lan = lan_ip() if network else None
         return {"mode": self.mode, "role": self.role, "demo_speed": self.demo_speed, "network": network, "port": port,
-                "feed": self.feed.info(), "reader": self.reader.info(),
+                "feed": self.feed.info(), "reader": self.reader.info(), "recorder": self.recorder.info(),
                 "riot": dict(self.riot.info(), received=round(time.time() - max(self.riot_at, self._riot_select_at), 1)
                              if max(self.riot_at, self._riot_select_at) else None), "update": self.updater.info(),
                 "scan": getattr(self, "last_scan", None),
@@ -667,7 +688,8 @@ class HudApp:
 
     def open_folder(self, which):
         folders = {"output": self.config.output_dir(), "logos": LOGO_DIR, "app": DATA_DIR, "sponsors": SPONSOR_DIR,
-                   "frames": os.path.join(DATA_DIR, "frames")}
+                   "frames": os.path.join(DATA_DIR, "frames"),
+                   "recordings": os.path.join(DATA_DIR, "recordings")}
         path = folders[which]
         os.makedirs(path, exist_ok=True)
         if sys.platform == "win32":

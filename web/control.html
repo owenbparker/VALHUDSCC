@@ -350,6 +350,10 @@
     <div class="row" style="margin-bottom:10px;align-items:center">
       <span class="note" id="riot-status" style="margin:0;flex:1"></span>
     </div>
+    <div class="row" style="margin-bottom:10px;align-items:center">
+      <span class="note" id="rec-status" style="margin:0;flex:1"></span>
+      <button type="button" data-open="recordings" style="flex:0 0 auto" title="Each match the reader sees is kept (about a frame a second and every reading) so it can be read again later to check reader fixes. Kept 14 days, at most 15 GB.">Recordings</button>
+    </div>
     <div class="feed" id="feed"></div>
     <details class="note" style="margin-top:8px">
       <summary>Sending live data to the HUD</summary>
@@ -642,6 +646,10 @@ function apply(s) {
   $("riot-status").textContent = riot.received != null && riot.received < 30
     ? `Riot Client: agent select and Riot IDs coming in (${riot.received}s ago)`
     : `Riot Client on this PC: ${riot.status || "off"}`;
+  const rec = app.recorder || {};
+  $("rec-status").textContent = rec.recording
+    ? `Recording this match for replay (${rec.frames} frames): ${rec.recording}`
+    : rec.enabled ? "Match recording: starts by itself at agent select" : "Match recording: off";
   const f = app.feed;
   $("feed").innerHTML = f.updates
     ? `${f.updates} updates received; last ${f.age}s ago. Sources: ` + Object.entries(f.sources).map(([k, v]) => `<code>${k}</code> (${v}s ago)`).join(", ")
