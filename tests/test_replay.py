@@ -88,6 +88,37 @@ class ReplayTests(unittest.TestCase):
         self.assertIn("3 of 3 rounds", replay.summary(dict(out, recording="x")))
 
 
+class RerunTests(unittest.TestCase):
+    def test_new_reader_rerun_over_a_recording(self):
+        """Today's reader let a misread score through; the new reader, run
+        again over the same raw readings, doesn't."""
+        roster = {"left": [{"name": "Derke", "agent": "Sova", "puuid": "b1", "team_id": "Blue"},
+                           {"name": "Boaster", "agent": "Sage", "puuid": "b2", "team_id": "Blue"}],
+                  "right": [{"name": "TenZ", "agent": "Jett", "puuid": "r1", "team_id": "Red"},
+                            {"name": "Zekken", "agent": "Omen", "puuid": "r2", "team_id": "Red"}]}
+        seen = [["left", 1, "Sova"], ["left", 2, "Sage"], ["right", 1, "Jett"], ["right", 2, "Omen"]]
+        events, t = [(0, "reading", {"source": "riot", "riot_roster": roster})], 1.0
+        for score in [(0, 0)] * 8 + [(0, 1)] * 3 + [(0, 11)] * 3 + [(0, 1)] * 2 + [(1, 1)] * 3 + [(1, 2)] * 3:
+            obs = {"source": "screen", "match": {"score": {"left": score[0], "right": score[1]}},
+                   "players": [{"team": a, "slot": b, "alive": True} for a, b, _ in seen], "seen_agents": seen}
+            events.append((t, "obs", obs))
+            events.append((t, "reading", {"source": "screen", "match": {"score": obs["match"]["score"]},
+                                          "players": [{"team": a, "slot": b, "agent": c} for a, b, c in seen]}))
+            t += 0.5
+        with tempfile.TemporaryDirectory() as tmp:
+            with open(os.path.join(tmp, "events.jsonl"), "w") as f:
+                for t_, kind, data in events:
+                    f.write(json.dumps({"t": t_, "kind": kind, "data": data}) + "\n")
+            with open(os.path.join(tmp, "match-details.json"), "w") as f:
+                json.dump(details(), f)
+            live = replay.report(tmp, AGENTS, "reading")
+            new = replay.report(tmp, AGENTS, "rerun")
+        self.assertEqual(live["score"]["wrong_scores_shown"], 1)
+        self.assertEqual(new["score"]["wrong_scores_shown"], 0)
+        self.assertEqual(new["score"]["rounds_shown"], 3)
+        self.assertEqual(new["names"], {"right": 4, "of": 4})
+
+
 class RecorderTests(unittest.TestCase):
     def test_records_a_match_and_keeps_the_answer_key(self):
         with tempfile.TemporaryDirectory() as tmp:

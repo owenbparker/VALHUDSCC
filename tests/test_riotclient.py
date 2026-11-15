@@ -38,7 +38,8 @@ class RiotClientTests(unittest.TestCase):
         match = {"Players": [{"Subject": "r1", "TeamID": "Red", "CharacterID": "omen-id"},
                              {"Subject": "b1", "TeamID": "Blue", "CharacterID": "jett-id"}]}
         self.assertEqual(riotclient.roster(match, AGENTS, {"r1": "Derke"}),
-                         {"left": [{"name": "Derke", "agent": "Omen"}], "right": [{"name": "", "agent": "Jett"}]})
+                         {"left": [{"name": "Derke", "agent": "Omen", "puuid": "r1", "team_id": "Red"}],
+                          "right": [{"name": "", "agent": "Jett", "puuid": "b1", "team_id": "Blue"}]})
 
 
 class AppTests(unittest.TestCase):

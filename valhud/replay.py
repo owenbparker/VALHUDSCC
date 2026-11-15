@@ -23,22 +23,46 @@ from .answerkey import AnswerKey
 SETTLE = 3.0   # seconds after a round's score shows that its K/D/A are checked
 
 
-def load_readings(folder):
-    """[(t, update)] from a recording's events.jsonl (screen readings only)."""
+def load_events(folder):
+    """[(t, kind, data)] from a recording's events.jsonl."""
     out = []
-    path = os.path.join(folder, "events.jsonl")
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(os.path.join(folder, "events.jsonl"), encoding="utf-8") as f:
             for line in f:
                 try:
                     e = json.loads(line)
                 except ValueError:
                     continue
-                d = e.get("data")
-                if e.get("kind") == "reading" and isinstance(d, dict) and d.get("source") in ("screen", None):
-                    out.append((float(e.get("t") or 0), d))
+                if isinstance(e.get("data"), dict):
+                    out.append((float(e.get("t") or 0), e.get("kind"), e["data"]))
     except OSError:
         pass
+    return out
+
+
+def load_readings(folder, kind="reading"):
+    """[(t, update)]: what the HUD got live ("reading", screen readings
+    only), or what the new reader would have shown ("shadow")."""
+    return [(t, d) for t, k, d in load_events(folder)
+            if k == kind and (kind != "reading" or d.get("source") in ("screen", None))]
+
+
+def rerun(folder):
+    """The new reader (tracker.py, as it is now) run again over the raw
+    readings kept with the recording: [(t, update)] it would have shown."""
+    from .tracker import Tracker
+    t_ = Tracker()
+    out = []
+    for t, kind, d in load_events(folder):
+        if kind == "reading" and isinstance(d.get("riot_roster"), dict):
+            t_.riot_roster([{"puuid": q.get("puuid"), "name": q.get("name"), "team": q.get("team_id"),
+                             "agent": q.get("agent")} for side in ("left", "right")
+                            for q in d["riot_roster"].get(side) or []])
+        elif kind == "reading" and (d.get("agent_select") or {}).get("active"):
+            t_.agent_select()
+        elif kind == "obs":
+            t_.observe(d, now=t)
+            out.append((t, t_.view()))
     return out
 
 
@@ -148,22 +172,27 @@ def score_readings(readings, key):
     }
 
 
-def report(folder, agents=None):
+def report(folder, agents=None, kind="reading"):
+    """kind: "reading" (what the HUD showed live), "shadow" (what the new
+    reader showed live, in shadow mode) or "rerun" (the new reader as it is
+    now, run again over the recording)."""
+    name = os.path.basename(folder.rstrip("/\\"))
     details = os.path.join(folder, "match-details.json")
     if not os.path.isfile(details):
-        return {"recording": os.path.basename(folder), "error": "no match-details.json (no answer key)"}
+        return {"recording": name, "kind": kind, "error": "no match-details.json (no answer key)"}
     key = AnswerKey.load(details, agents)
-    out = score_readings(load_readings(folder), key)
-    out["recording"] = os.path.basename(folder.rstrip("/\\"))
+    readings = rerun(folder) if kind == "rerun" else load_readings(folder, kind)
+    out = score_readings(readings, key)
+    out["recording"], out["kind"] = name, kind
     return out
 
 
 def summary(r):
     if r.get("error"):
-        return f"{r['recording']}: {r['error']}"
+        return f"{r['recording']} [{r.get('kind', 'reading')}]: {r['error']}"
     s, k, n = r["score"], r["kda"], r["names"]
     pct = lambda a, b: f"{100 * a / b:.0f}%" if b else "-"
-    return (f"{r['recording']}: score showed {s['rounds_shown']} of {r['rounds']} rounds, "
+    return (f"{r['recording']} [{r.get('kind', 'reading')}]: score showed {s['rounds_shown']} of {r['rounds']} rounds, "
             f"{s['wrong_scores_shown']} wrong scores shown; K/D/A right {pct(k['right'], k['checked'])} "
             f"({k['kill_error']} kills off in total); names right {n['right']} of {n['of']}")
 
@@ -173,13 +202,15 @@ def main(argv=None):
     ap.add_argument("recordings", nargs="+")
     ap.add_argument("--agents", help="riot-agents.json (agent ids -> names), from the app's folder")
     ap.add_argument("--json", help="write the full report here")
+    ap.add_argument("--kind", action="append", choices=("reading", "shadow", "rerun"),
+                    help="what to score (default: all three, side by side)")
     a = ap.parse_args(argv)
     agents = None
     if a.agents:
         with open(a.agents, encoding="utf-8") as f:
             agents = json.load(f)
     folders = [p for pat in a.recordings for p in (glob.glob(pat) or [pat]) if os.path.isdir(p)]
-    reports = [report(f, agents) for f in folders]
+    reports = [report(f, agents, k) for f in folders for k in (a.kind or ("reading", "shadow", "rerun"))]
     for r in reports:
         print(summary(r))
     if a.json:

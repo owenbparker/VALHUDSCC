@@ -211,6 +211,11 @@ class HudApp:
         """The screen reader's reading: used here, or sent to the GFX PC when
         this is an observer client."""
         self.recorder.event("reading", update)
+        if isinstance(update, dict) and isinstance(update.get("riot_roster"), dict):
+            # (the new reader, in shadow mode, goes by the Riot Client's players)
+            self.reader.tracker.riot_roster([
+                {"puuid": q.get("puuid"), "name": q.get("name"), "team": q.get("team_id"), "agent": q.get("agent")}
+                for side in ("left", "right") for q in update["riot_roster"].get(side) or []])
         cfg = self.config.get()
         if self.role == "observer":
             if not cfg.get("observer_url"):

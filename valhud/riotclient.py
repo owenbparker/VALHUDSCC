@@ -136,7 +136,9 @@ def roster(match, agents, names, attack_first="left"):
         if not side or (p.get("PlayerIdentity") or {}).get("IsObserver"):
             continue
         out[side].append({"name": names.get(p.get("Subject"), ""),
-                          "agent": agents.get(str(p.get("CharacterID") or "").lower(), "")})
+                          "agent": agents.get(str(p.get("CharacterID") or "").lower(), ""),
+                          # (who it is and their real team, for the new reader: tracker.py)
+                          "puuid": p.get("Subject"), "team_id": p.get("TeamID")})
     return out
 
 
